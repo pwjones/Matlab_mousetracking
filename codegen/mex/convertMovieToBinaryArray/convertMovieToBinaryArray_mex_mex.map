@@ -1,0 +1,4 @@
+_mexFunction
+_convertMovieToBinaryArray
+_convertMovieToBinaryArray_initialize
+_convertMovieToBinaryArray_terminate
