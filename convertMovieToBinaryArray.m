@@ -1,9 +1,9 @@
-function [binArray, avg_frame] = convertMovieToBinaryArray(mov_struct) %#codegen
+function [binArray, avg_frame] = convertMovieToBinaryArray(mov_struct, frame_range) %#codegen
 
 % declare rgb2gray extrinsic, meaning that it stays a matlab function
 coder.extrinsic('rgb2gray', 'imabsdiff', 'graythresh', 'im2bw');
 
-mov = mov_struct.frames;
+mov = mov_struct.frames(frame_range);
 new_mov = zeros([size(mov(1).cdata,1) size(mov(1).cdata,2) length(mov)], 'uint8');
  for ii=1:length(mov)
      new_mov(:,:,ii) = rgb2gray(mov(ii).cdata);

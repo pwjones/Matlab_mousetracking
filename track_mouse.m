@@ -4,8 +4,9 @@ function com = track_mouse(makeVideo, timeRange)
 % makeVideo is a boolean value about whether to write an output video to 
 % file or not
 
+MAX_FRAMES = 600; % the maximum number of frames processable at one time by matlab due to memory limitations
 
-movie_folder = '/Users/pwjones/Documents/urbanlab/igor/mousetracking/'; %default movie folder
+movie_folder = '/Users/pwjones/Documents/urbanlab/data/mouse_training/'; %default movie folder
 movie_fn = uigetfile([movie_folder '*.*']);
 movie_fn = [movie_folder movie_fn];
 
@@ -13,9 +14,25 @@ movie_fn = [movie_folder movie_fn];
 % this is one downloaded from the matlab forums
 [mov_struct, ~] = mmread(movie_fn,[],timeRange);
 
+% want to get the data into a 3D matrix - seems the best format.  
+% However, there is some complication with large movies fitting into memory.
+% Need to divide the movie into segments, and process each sequentially.
+% Can not parallelize on a single computer because this is a memory issue.
 nFrames = length(mov_struct.frames);
-% want to get the data into a 3D matrix - seems the best format
-[binary_mov, avg_frame] = convertMovieToBinaryArray(mov_struct);
+nSegs = ceil(nFrames/MAX_FRAMES);
+binary_mov = zeros([mov_struct.height, mov_struct.width, nFrames], 'uint8');
+avg_frame = zeros([mov_struct.height, mov_struct.width, nSegs], 'uint8');
+for ii=1:nSegs
+    first = (ii-1)*MAX_FRAMES + 1;
+    if (ii == nSegs)
+        last = nFrames;
+    else
+        last = (ii)*MAX_FRAMES;
+    end
+        [binary_mov(:,:,first:last), avg_frame(:,:,ii)] = convertMovieToBinaryArray(mov_struct, first:last);
+end
+
+avg_frame = uint8(mean(avg_frame,3));
 
 % track the position of the center of the white area over time
 % preallocate AREAS
@@ -37,7 +54,7 @@ vel_pxsec = dists * mov_struct.rate; % Velocities in px/sec
 
 if makeVideo
     useBinMovie = 0;
-    vidWriter = VideoWriter('/Users/pwjones/Documents/urbanlab/igor/mousetracking/tracking.avi');
+    vidWriter = VideoWriter([movie_folder '/tracking.avi']);
     open(vidWriter);
     figure;
     for ii=1:nFrames
