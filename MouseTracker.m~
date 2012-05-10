@@ -8,7 +8,7 @@ classdef MouseTracker < handle
         frameRate 
         totalDuration %total length of the movie
         nFrames 
-        frameRange % frames numbers loaded in reference to original file
+        frameRange % frame numbers loaded in reference to original file
         avgFrame % the time averaged frame
         nMice = 1 % number of mice tracked
         COM % center of mass for each mouse
@@ -17,6 +17,9 @@ classdef MouseTracker < handle
         direction %movement direction
         times % frame times
         areas % mouse regions
+    end
+    properties (GetAccess = private)
+        exitMovie = 0
     end
     
     methods
@@ -52,8 +55,10 @@ classdef MouseTracker < handle
                 this.videoFN = filename;
             end
             % Read just a couple of frames to get an idea of video speeds, etc.
-            vid_struct = mmread(this.videoFN, 1:2); 
+            vid_struct = mmread(this.videoFN, 1); 
             this.frameRate = vid_struct.rate;
+            this.width = vid_struct.width;
+            this.height = vid_struct.height;
             
             % figure out the range of frames to be considered
             time_range = []; this.frameRange = [];
@@ -95,6 +100,7 @@ classdef MouseTracker < handle
                 nanFrames = wantedFrames(isnan(wantedCOM(:,1,1)));
                 this = this.findMouse(nanFrames);
             end 
+            % get what they wanted
             wantedCOM = this.COM(wantedFrames,:,:);
             nose = [];
         end
@@ -121,17 +127,83 @@ classdef MouseTracker < handle
             % unfortunately, I haven't been able to figure out an easier way to do colormapping of points plotted over
             % a B&W image, without the points and the image sharing the same colormap.  So, here I'm just plotting every
             % point separately, with a color indicative of the velocity of the animal.
-            for ii=2:this.nFrames
-                ci = find(sorted_vel == vel_pxsec(ii-1), 1, 'first');
-                line('Xdata', com(ii,1), 'Ydata', com(ii,2), 'Marker', '.', 'MarkerSize', 10, 'Color', cm(ci,:));
-            end
-
-            
+            for ii=1:this.nFrames
+                ci = find(sorted_vel == this.vel(ii), 1, 'first');
+                if ~isnan(ci)
+                    line('Xdata', this.COM(ii,1), 'Ydata', this.COM(ii,2), 'Marker', '.', 'MarkerSize', 10, 'Color', cm(ci,:));
+                end
+            end 
         end
-                
+        
+        function writeMovie(this, filename, useBinMovie)
+            % function writeMovie(this, filename)
+            % Writes a movie of the tracked mouse to disk at the given location
+            vidWriter = VideoWriter(filename);
+            open(vidWriter);
+            figure;
+            for ii=1:this.nFrames
+                this.showFrame(ii, useBinMovie);
+                currFrame = getframe; % now to the business of writing the movie
+                writeVideo(vidWriter,currFrame);
+                hold off;
+            end
+            close(vidWriter);
+        end
+       
+        function showMovie(this, useBinMovie, frameRange)
+            % function showMovie(this, useBinMovie, frameRange)
+            fh = figure;
+            set(fh, 'WindowKeyPressFcn', @this.exitMovieLoop);
+            if exist('frameRange','var') && ~isempty(frameRange)
+                lr = frameRange;
+            else
+                lr = 1:this.nFrames;
+            end
+            for ii=lr
+                if this.exitMovie
+                    break
+                end
+                this.showFrame(ii, useBinMovie);
+                hold off;
+                pause(1/this.frameRate);
+            end
+            this.exitMovie = 0;
+        end
+        
+        function exitMovieLoop(this, src, event)
+            if strcmp(event.Key, 'q') || strcmp(event.Key, 'escape')
+                this.exitMovie = 1;
+            end
+            end
     end
     
     methods (Access = private)
+        function showFrame(this, ii, useBinMovie)
+            if useBinMovie
+                on = this.areas(ii).PixelIdxList;
+                bf = zeros(this.height, this.width);
+                bf(on) = 255;
+                imshow(bf); hold on;
+                
+                % let's try dilating things
+                z = zeros(this.height, this.width, 3);
+                z(:,:,1) = bf; z(:,:,3) = bf;
+                SE = strel('rectangle', [4,3]);
+                im2 = imdilate(bf, SE);
+                im2 = repmat(im2, [1, 1, 3]);
+                im2 = im2 - z;
+                imshow(im2);
+            else
+                f = mmread(this.videoFN, this.frameRange(ii));
+                imshow(f.frames.cdata); hold on;
+            end
+            
+            % These are the real operations
+            plot(this.COM(ii,1), this.COM(ii,2), 'r+', 'MarkerSize', 12, 'LineWidth',1);
+            ellipse(this.areas(ii).MajorAxisLength, this.areas(ii).MinorAxisLength, -this.orient(ii), this.COM(ii,1),this.COM(ii,2),'r');
+            line(this.areas(ii).Extrema(:,1), this.areas(ii).Extrema(:,2), 'Marker', '.', 'Color', 'c');
+        end
+        
         function movieArray = readMovieSection(this, frames, binary)
             vid_struct = mmread(this.videoFN, frames+this.frameRange(1)-1); %this final call is where we compensate for an offset 
             vid_struct = this.convertToGray(vid_struct);
@@ -143,25 +215,40 @@ classdef MouseTracker < handle
         end
         
         function this = findMouse(this, frames)
-        % function positions = findMousePosition(this, frames)    
-            props = {'BoundingBox', 'Centroid', 'Perimeter', 'Area', 'Orientation', 'MajorAxisLength', 'MinorAxisLength', 'PixelList'};
-            frameArray = this.readMovieSection(frames,1);
-            if isempty(this.areas) %initialize areas field if it hasn't been
-                areas = regionprops(frameArray(:,:,1), props); %built-in that gives stats on binary images
-                this.areas = repmat(areas, this.nFrames, this.nMice); % make a struct arraay length of nFrames
-            end
-            for ii = 1:length(frames)  %have to work 1 frame at a time, unfortunately
-                temp_reg = regionprops(frameArray(:,:,ii), props);
-                if ~isempty(temp_reg)
-                    this.areas(frames(ii)) = regionprops(frameArray(:,:,ii), props);
-                else %this is a kluge - unclear what the best thing to do is if you don't detect a blob
-                    subI = max(1, ii-1);
-                    this.areas(frames(ii)) = this.areas(frames(subI)); %this will error on ii=1
+            % function this = findMouse(this, frames)
+            
+            % The list of properties detected in the binary image of each frame
+            props = {'BoundingBox', 'Centroid', 'Perimeter', 'Area', 'Orientation', 'MajorAxisLength', ...
+                     'MinorAxisLength', 'PixelList', 'PixelIdxList', 'Extrema'};
+            nSegs = ceil(length(frames)/this.framesPerSeg);
+            for jj = 1:nSegs %divide the computation up into segments so that there is never too much in memory at once
+                first = (jj-1)*this.framesPerSeg + 1; %first frame of segment
+                if (jj == nSegs) % the last frame
+                    last = frames(end);
+                else
+                    last = (jj)*this.framesPerSeg;
                 end
-            end 
+                segFrames = frames(first:last);
+                
+                disp(['Finding mouse in segment ' num2str(jj)]);
+                frameArray = this.readMovieSection(segFrames,1);
+                if isempty(this.areas) %initialize areas field if it hasn't been
+                    areas = regionprops(frameArray(:,:,1), props); %built-in that gives stats on binary images
+                    this.areas = repmat(areas, this.nFrames, this.nMice); % make a struct arraay length of nFrames
+                end
+                for ii = 1:length(segFrames)  %have to work 1 frame at a time, unfortunately
+                    temp_reg = regionprops(frameArray(:,:,ii), props);
+                    if ~isempty(temp_reg)
+                        this.areas(segFrames(ii)) = regionprops(frameArray(:,:,ii), props);
+                    else %this is a kluge - unclear what the best thing to do is if you don't detect a blob
+                        subI = max(1, ii-1);
+                        this.areas(segFrames(ii)) = this.areas(frames(subI)); %this will error on ii=1
+                    end
+                end
+            end
             positions = reshape([this.areas(frames).Centroid], 2,[])';
             this.COM(frames, :) = positions;
-            this.orient(frames, :) = this.areas(frames).Orientation;
+            this.orient(frames, :) = [this.areas(frames).Orientation]./ 180 * pi;
             this = this.computeVelocity(frames);
             
         end
