@@ -1,7 +1,7 @@
 classdef MouseTracker < handle
     properties
         MOUSE_SCALE = 18; % minimal size of the mouse used to exclude smaller objects - radius of mask
-        MIN_SIZE_THRESH = 600; %minimal size of a binary area in pixels
+        MIN_SIZE_THRESH = 40; %minimal size of a binary area in pixels
         videoFN = []; % filename of the video
         framesPerSeg = 100 %the # of frames read at one time
         avgSubsample = 60 %sample every X frames to make the average
@@ -24,6 +24,7 @@ classdef MouseTracker < handle
         areas % mouse regions
         tailVisible % boolean
         paths
+        boostContrast = 0; %boolean switch to boost contrast of the movie
     end
     properties (GetAccess = private)
         exitMovie = 0
@@ -597,6 +598,9 @@ classdef MouseTracker < handle
                 elseif (morient >= 7*pi/4 && morient < 2*pi)
                     ei = 3;
                 end
+                corner = this.areas(fi).Extrema(ei,:);
+                corner_vect = corner - this.COM(fi,:);
+                % So, 
                 nosep(ii,:) = this.areas(fi).Extrema(ei,:);
             end
         end
@@ -633,11 +637,14 @@ classdef MouseTracker < handle
             end
             vid_struct = this.readFrames(f);
             gf = vid_struct.frames(1).cdata;
-            gf = 255 - gf; %invert the image
-            sigma = 25;
-            h = fspecial('gaussian', 6*sigma, sigma);
-            background = imfilter(gf, h);
-            gf = gf - background;
+            %gf = 255 - gf; %invert the image
+            
+            % Filter out the background in order to detect sharp changes
+%             sigma = 25;
+%             h = fspecial('gaussian', 6*sigma, sigma);
+%             background = imfilter(gf, h);
+%             gf = gf - background;
+            % adjust the image to take the whole range
             mingf = double(min(gf(:))); maxgf = double(max(gf(:)));
             gf = imadjust(gf, [mingf/255; maxgf/255], [0; 1]);
             %background = imopen(gf,strel('disk', disk_size)); %finds a background via opening of the grayscale image
@@ -712,9 +719,11 @@ classdef MouseTracker < handle
                 imshow(bf, [0 0 0; 1 1 1; 1 0 0; 0 0 1; 1 1 1; 1 0 0]); hold on;  
             else
                 %f = mmread(this.videoFN, this.frameRange(ii));
-                f = this.readFrames(ii);
+                %f = this.readFrames(ii);
                 %imshow(f.frames.cdata); 
-                imshow(imabsdiff(f.frames.cdata, this.avgFrame));
+                f = this.readMovieSection(ii,0);
+                imshow(f);
+                %imshow(imabsdiff(f.frames.cdata, this.avgFrame));
                 hold on;
             end
             %annotate the image
@@ -785,6 +794,7 @@ classdef MouseTracker < handle
             % returns a binary thresholded movie using the frames specified in the input. Also there is
             % an optional argument 'subFrame' specifying a frame to subtract from each frame in order to
             % improve the thresholding of certain objects.
+            boostContrast = 1; %flag for boosting the contrast
             if (length(mov_struct.frames) < length(frame_range))
                 disp('In MouseTracker.convertMovieToBinaryArray: frame_range specified is too large for movie.  Trimming');
                 frame_range = frame_range(1:length(mov_struct.frames));
@@ -802,17 +812,19 @@ classdef MouseTracker < handle
             end
             avg_mov = repmat(avg_frame, [1 1 length(mov)]);
             new_mov = imabsdiff(new_mov, avg_mov); %this should give a nice moving blob.
-            new_mov2 = increaseMovContrast(new_mov);
+            if(boostContrast)
+                new_mov = increaseMovContrast(new_mov);
+            end
             if binary
                 ret_mov = zeros(size(new_mov), 'uint8');
                 nFrames = size(ret_mov,3);
-                thresh = graythresh(new_mov2)*.9;
+                thresh = graythresh(new_mov)*.9;
                 %thresh = .5*thresh; %changing the thresh a little to include more in the blob (including more tail)
                 for ii = 1:nFrames
                     %thresh = graythresh(new_mov(:,:,ii)); % threshold for each frame separately
                     %this is to get rid of the jagged edges due to something regarding movie compression, but also
                     %removes one pixel around the edge of the contiguous sections of blob
-                    bw = im2bw(new_mov2(:,:,ii),thresh);
+                    bw = im2bw(new_mov(:,:,ii),thresh);
                     %bwf = imerode(bw, strel('square',3)); 
                     ret_mov(:,:,ii) = bw;
                 end
