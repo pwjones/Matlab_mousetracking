@@ -120,6 +120,7 @@ classdef MouseTrackerUnder2 < handle
                 avgRange = 1:this.avgSubsample:length(this.frameRange);
                 vidArray = this.readFrames(this.listToIntervals(avgRange), 'discontinuous');
                 this.avgFrame = uint8(mean(vidArray, 3));
+                %this.avgFrame = mean(vidArray,3);
                 %this.averageFrame(vidArray, 1:length(vid_struct.frames));
 
                 % Populate the fields with empty data
@@ -195,6 +196,7 @@ classdef MouseTrackerUnder2 < handle
         end
         
         function plotVelocityTimes(this, time_range)
+         % Version using a range of times, rather than frames
             frames = this.timesToFrames(time_range);
             this.plotVelocity(frames);
         end
@@ -816,8 +818,10 @@ classdef MouseTrackerUnder2 < handle
             adjFrames = frames+this.frameRange(1)-1;
             if strcmp(flag, 'single')
                 res = this.readerObj.read(adjframes(1));
+                res = squeeze(res(:,:,1));
             elseif strcmp(flag,'continuous')
                 res = this.readerObj.read(adjFrames);
+                res = squeeze(res(:,:,1,:));
             elseif strcmp(flag, 'discontinuous') %due to limitations in videoReader class, have to loop for this
                 totalFrames = sum(diff(frames')'+1);
                 res = zeros(this.height, this.width, totalFrames); %4D matrix
@@ -836,6 +840,7 @@ classdef MouseTrackerUnder2 < handle
                 end
             end
             %res = res(:,:,1,:); %make grayscale
+             %make grayscale from already grayscale (but 3 channel) movie input
             res = this.applyCrop(res); %crop
 %             vid_struct = mmread(this.videoFN, frames+this.frameRange(1)-1); %this final call is where we compensate for an offset
 %             % sometimes vid_struct comes back as an array with one empty field, fix it
@@ -903,14 +908,14 @@ classdef MouseTrackerUnder2 < handle
             % an optional argument 'subFrame' specifying a frame to subtract from each frame in order to
             % improve the thresholding of certain objects. rawArray is in the format of dim1,2 - height,width, 3- frame#.
             boostContrast = 1; %flag for boosting the contrast
-            new_mov = rawArray(frame_range);
+            new_mov = rawArray(:,:,frame_range);
             % make a movie from the average frame to subtract
             if ~isempty(subFrame)
                 avg_frame = subFrame;
             else
                 avg_frame = uint8(round(mean(new_mov,3)));
             end
-            avg_mov = repmat(avg_frame, [1 1 size(new_mov,3)]);
+            avg_mov = uint8(repmat(avg_frame, [1 1 size(new_mov,3)]));
             new_mov = imabsdiff(new_mov, avg_mov); %this should give a nice moving blob.
             if(boostContrast)
                 new_mov = increaseMovContrast(new_mov);
