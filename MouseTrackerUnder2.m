@@ -136,16 +136,16 @@ classdef MouseTrackerUnder2 < handle
         function [wantedCOM, nose] = mousePosition(this, time_range)
         % function [wantedCOM, nose] = mousePosition(this, time_range)    
          % Returns the position of the mouse center of mass (body) and 
-         % eventually the nose for the specified time range
+         % the nose for the specified time range
             wantedFrames = this.timesToFrames(time_range); 
-            wantedCOM = this.COM(wantedFrames,:,:);
+            wantedCOM = this.bodyCOM(wantedFrames,:);
             if isnan(wantedCOM)
-                nanFrames = wantedFrames(isnan(wantedCOM(:,1,1)));
+                nanFrames = wantedFrames(isnan(wantedCOM(:,1)));
                 this = this.findMouse(nanFrames);
             end 
             % get what they wanted
-            wantedCOM = this.COM(wantedFrames,:,:);
-            nose = [];
+            wantedCOM = this.bodyCOM(wantedFrames,:);
+            nose = this.nosePos(wantedFrames, :);
         end
         
         % ------------------------------------------------------------------------------------------------------
@@ -158,6 +158,22 @@ classdef MouseTrackerUnder2 < handle
                 this.mousePosition(time_range);
             end
             [this, vel] = this.computeVelocity(frames);
+        end
+        
+        % ----------------------------------------------------------------------------------------------------
+        function tailPos = tailPosition(this, frames)
+        % function tailPos = tailPosition(this, frames)
+        %
+        % We aren't going to want the tail position all that much, so assemble it each time
+            tv = logical(this.tailVisible(frames));
+            tb = this.tailblob(frames);
+            tailPos = NaN*zeros(length(frames), 2);
+            areas = this.areas(frames,:);
+            for ii = 1:length(areas)
+                if tv(ii)
+                    tailPos(ii,:) = areas(ii,tb(ii)).Centroid;
+                end
+            end
         end
         
         % ------------------------------------------------------------------------------------------------------
@@ -202,8 +218,37 @@ classdef MouseTrackerUnder2 < handle
         end
         
         % ------------------------------------------------------------------------------------------------------
+        function plotPosition(this, frames)
+            % function plotPosition(this, frames)
+            %
+            % This plots the detected mouse positions in red over the background frame
+        
+            if ~exist('frames', 'var') || isempty(frames); frames = 1:this.nFrames; end
+            fh = figure;
+            ah = axes('position', [.1, .1, .7 .8]);
+            cm = colormap(hsv(this.nFrames));
+            sorted_dir = sort(this.direction); %sorted vector for colormapping
+            pathIm = this.plotPaths()*255;
+            redIm = min(this.avgFrame + pathIm, 255);
+            blueIm = max(this.avgFrame - pathIm, 0);
+            bgIm = cat(3, blueIm, blueIm, redIm);
+            imshow(bgIm); hold on;
+            xlim([0 this.width]);
+            ylim([0 this.height]);
+            for ii=1:length(frames)
+                fi = frames(ii);
+                ci = find(sorted_dir == this.direction(fi), 1, 'first');
+                if ~isnan(this.noseblob(fi))
+                    line('Xdata', this.areas(fi,this.noseblob(fi)).Centroid(1), 'Ydata', ...
+                        this.areas(fi,this.noseblob(fi)).Centroid(2), 'Marker', '.', 'MarkerSize', 10, 'Color', 'r');
+                end
+            end 
+        end
+        
+        
+        % ------------------------------------------------------------------------------------------------------
         function plotDirection(this, frames)
-            % function plotVelocity(this)
+            % function plotDirection(this, frames)
             if ~exist('frames', 'var') || isempty(frames); frames = 1:this.nFrames; end
             fh = figure;
             ah = axes('position', [.1, .1, .7 .8]);
@@ -427,17 +472,8 @@ classdef MouseTrackerUnder2 < handle
                 frames = frames(1:this.nFrames); %just trim them off the end - this error only happens for last seg
                 this.trimFields(); %trim the object property arrays
             end
-            this.findNose(frames,[])
-            this.bodyOrient(frames) = this.computeBodyOrientation(frames);
-%             positions = reshape([this.areas(frames,:).Centroid], 2,[], size(this.COM,3))';
-%             for ii = 1:size(positions,3) % number of blobs
-%                 this.COM(frames, :, ii) = positions(:,:,ii);
-%                 this.orient(frames, ii) = [this.areas(frames,ii).Orientation]./ 180 * pi; %this is the rough estimate
-%                 this = this.computeVelocity(frames);
-%                 this.detectTail(frames);
-%                 this.computeOrientation(frames); % go back and get a direction/orientation
-%                 this.nosePos(frames,:,ii) = this.findNose(frames,ii); %based on orientation, get the nose position
-%             end
+            this.nosePos(frames, :) = this.findNose(frames);
+            this.bodyOrient(frames) = this.computeBodyOrientation(frames);    
             
         end
         
@@ -447,6 +483,7 @@ classdef MouseTrackerUnder2 < handle
         %
         % The idea here is to fill in the body space using dilation of the 
             se = strel('disk',20);
+            orient = NaN*zeros(length(frames),1);
             for ii=1:length(frames)
                 fi = frames(ii);
                 if (this.nblobs(fi) > 1)
@@ -605,7 +642,6 @@ classdef MouseTrackerUnder2 < handle
             
         end
         
-         % -----------------------------------------------------------------------------------------------------
         % -----------------------------------------------------------------------------------------------------
         function detectTail(this, frames)
             % Trying to detect if we can see a tail on a frame by frame basis
@@ -623,7 +659,7 @@ classdef MouseTrackerUnder2 < handle
             end
         end
         % ------------------------------------------------------------------------------------------------------
-        function nosep = findNose(this, frames, blobi)
+        function nosep = findNose(this, frames)
         % function nosep = findNose(this, frames, blobi)
         %
         % So, the method for finding which blob is the nose is to take the tail and body center and take the 
@@ -633,15 +669,16 @@ classdef MouseTrackerUnder2 < handle
                 fi = frames(ii);
                 if (this.nblobs(fi) > 1) %only works if there are things to track
                     if this.tailVisible(fi) %we can only do this first method if the tail is present
+                        % compute the vector from tail to body center
                         bodyVect = this.bodyCOM(fi,:) - this.areas(fi,this.tailblob(fi)).Centroid;
                         dist = [];
                         for jj=1:this.nblobs(fi)
                             areaVect = this.areas(fi,jj).Centroid - this.areas(fi,this.tailblob(fi)).Centroid;
                             dist(jj) = dot(areaVect, bodyVect);
                         end
-                        [maxd, maxi] = max(dist);
-                        this.noseblob(fi) = maxi;
-                        nosep(fi,:) = this.areas(fi,this.noseblob(fi)).Centroid;
+                        [maxd, maxi] = max(dist); %the maximum distance and ind along tail-body vector of each blob  
+                        this.noseblob(fi) = maxi; 
+                        nosep(ii,:) = this.areas(fi,this.noseblob(fi)).Centroid; % The nose is the farthest along vector
                     end
                 end
             end
@@ -655,8 +692,8 @@ classdef MouseTrackerUnder2 < handle
             this.orient = NaN*zeros(this.nFrames, this.maxBlobs);
             this.vel = NaN*zeros(this.nFrames, this.maxBlobs);
             this.direction = NaN*zeros(this.nFrames, this.maxBlobs);
-            this.tailVisible = zeros(this.nFrames, this.maxBlobs);
-            this.nosePos = NaN*zeros(this.nFrames, 2, this.maxBlobs); %nose position
+            this.tailVisible = zeros(this.nFrames, 1);
+            this.nosePos = NaN*zeros(this.nFrames, 2); %nose position
             this.nblobs = zeros(this.nFrames, 1);
             this.tailblob = NaN*zeros(this.nFrames,1);
             this.noseblob = NaN*zeros(this.nFrames,1);
@@ -670,6 +707,14 @@ classdef MouseTrackerUnder2 < handle
 %             tempareas = tempareas(1);
 %             this.areas = repmat(tempareas, this.nFrames, this.maxBlobs); % make a struct arraay length of nFrames
         end
+        
+        % ------------------------------------------------------------------------------------------------------
+        function clearPathData(this)
+         % function clearPathData(this)
+         % Clears the path data
+            this.paths = [];
+        end
+            
         % ------------------------------------------------------------------------------------------------------
         function [e, eimage] = detectEdgesInFrame(this, time, absoluteTime, useAvgFrame)
             % function e = detectEdgesInFrame(this, time, absoluteTime)
@@ -754,7 +799,7 @@ classdef MouseTrackerUnder2 < handle
             this.paths = e;
             %traces = bwtraceboundary(eimage, p, 'e');
         end
-        
+        % ------------------------------------------------------------------------------------------------------
         function pathIm = plotPaths(this)
             %returns a binary image (uint8 format) of the detected paths
             
@@ -763,6 +808,83 @@ classdef MouseTrackerUnder2 < handle
                 path = this.paths(ii);
                 pathIm(path.PixelIdxList) = 1;
             end
+        end
+        
+        % ------------------------------------------------------------------------------------------------------
+        function noseDist = noseDistToTrail(this, frames)
+        % function noseDist = noseDistToTrail(this, frames)
+        % 
+        % returns the distances for the nose position to the closest point of trail
+        % for each of the frames specified
+            if (~isempty(this.paths))
+                nosePos = this.nosePos(frames,:);
+                trailPos = this.paths(1).PixelList;
+                distm = ipdm(nosePos, trailPos);
+                noseDist = nanmin(distm, [], 2);
+            else
+                noseDist = NaN*zeros(length(frames), 1);
+                disp('There must be a detected path to calculate distances');
+            end
+
+        end
+        
+        % ------------------------------------------------------------------------------------------------------
+        function pTime = propTimeOnTrail(this, frames, trailNum, threshDist)
+        %function pTime = propTimeOnTrail(this, frames, trailnum)    
+        %
+        % Return the percentage of the time period given that the mouse 
+        % was within the threshold distance from the trail.
+            traillNum = 1; % Eventually we need 2+ trails
+            if nargin < 4 %default distance
+                threshDist = 10;
+            end
+            pTime = 0; %default return value
+            dists = this.noseDistToTrail(frames);
+            nn = ~isnan(dists);
+            nnframes = frames(nn);
+            dists = dists(nn);
+            numFrames = length(nnframes);
+            closeFrames = sum(dists < threshDist);
+            pTime = closeFrames/numFrames;
+        end
+        
+        % ---------------------------------------------------------------------------------------------------
+        function [distTraveled, frameNums] = distanceOnTrail(this, frames, trailNum, threshDist)
+        % function [dists, frames] = distanceOnTrail(this, frames, threshDist) 
+        %
+        % Returns the distances travelled along the trail, along with the
+        % frame numbers for the following onset and offset.
+            if isempty(frames)
+                frames = 1:this.nFrames;
+            end
+            traillNum = 1; % Eventually we need 2+ trails
+            if nargin < 4 %default distance
+                threshDist = 10;
+            end
+            distTraveled = [];
+            frameNums = [];
+            
+            dists = this.noseDistToTrail(frames);
+            nn = ~isnan(dists);
+            nnframes = frames(nn);
+            dists = dists(nn);
+            numFrames = length(nnframes);
+            trackingInds = find(dists < threshDist); %close to trail
+            trackJumps = diff(trackingInds); %identify contiguous and non are 
+            skips = find(trackJumps > 1); % noncontiguous
+            seq_end = trackingInds(skips); %these are the indices of segments of following
+            seq_start = [1 trackingInds(skips(1:end-1)+1)']';
+            frame_start = nnframes(seq_start); %now get the actual frame numbers
+            frame_end = nnframes(seq_end);
+            frameNums = [frame_start(:) frame_end(:)];
+            distTraveled = NaN*zeros(size(frameNums,1),1);
+            for ii=1:size(frameNums,1)
+                range = frameNums(ii,1):frameNums(ii,2);
+                pos = this.nosePos(range,:);
+                point_diffs = diff(pos);
+                distTraveled(ii) = nansum(sqrt(nansum(point_diffs.^2,2)));
+            end
+            
         end
         % ------------------------------------------------------------------------------------------------------
         function showFrame(this, framei, useBinMovie)
