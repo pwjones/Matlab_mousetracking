@@ -1,0 +1,10 @@
+look through all of the paths in 12/12-12/14
+/Users/pwjones/Movies/mouse_training/121216/9085_2012-12-16-191327-0000.mat
+/Users/pwjones/Movies/mouse_training/121217/9085_2012-12-17-163129-0000.mat
+/Users/pwjones/Movies/mouse_training/121217/9085_2012-12-17-164510-0000.mat
+/Users/pwjones/Movies/mouse_training/121217/9085_2012-12-17-165739-0000.mat
+/Users/pwjones/Movies/mouse_training/121218/9085_2012-12-18-194706-0000.mat
+/Users/pwjones/Movies/mouse_training/121219/9085_2012-12-19-123031-0000.mat
+/Users/pwjones/Movies/mouse_training/121219/9085_2012-12-19-124536-0000.mat
+/Users/pwjones/Movies/mouse_training/121219/9085_2012-12-19-125734-0000.mat
+every file from 12/19, 12/21
