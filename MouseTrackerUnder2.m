@@ -1,22 +1,22 @@
 classdef MouseTrackerUnder2 < handle
     properties
         MOUSE_SCALE = 10; % minimal size of the mouse used to exclude smaller objects - radius of mask
-        MIN_SIZE_THRESH = 40; %minimal size of a binary area in pixels
+        MIN_SIZE_THRESH = 30; %minimal size of a binary area in pixels
         MAX_SIZE_THRESH = 1200;
         videoFN = []; % filename of the video
         readerObj; %videoReader object 
         framesPerSeg = 200 %the # of frames read at one time
         avgSubsample = 60 %sample every X frames to make the average
         width % movie dimensions
-        height
-        crop 
+        height 
+        crop % number of pixels trimmed from each side of movie
         frameRate %fps
         totalDuration %total length of the movie, sec
         nFrames
         trustFrameCount %mmread sometimes fails to exactly get the number of frames
         frameRange % frame numbers loaded in reference to original file
         avgFrame % the time averaged frame
-        maxBlobs = 8 % number of mouse sections tracked
+        maxBlobs = 10 % number of mouse sections tracked
         nblobs %numer of sections found in each frame
         tailblob %the index of the tail blob for each frame
         noseblob %the index of the nose blob for each frame
@@ -30,10 +30,11 @@ classdef MouseTrackerUnder2 < handle
         times % frame times
         areas % mouse regions
         tailVisible % boolean
-        paths
+        paths %binary areas for the detected paths
         boostContrast = 1; %video processing option, boolean switch to boost contrast of the movie on each frame
         % The list of properties detected in the binary image of each frame
         regprops = {'Area', 'Centroid', 'BoundingBox','MajorAxisLength','MinorAxisLength','Orientation','Extrema','PixelIdxList','PixelList','Perimeter'};
+        blobsToDelete = []; %list for debugging purposes of those blobs to delete - to mark them.
     end
     properties (SetAccess = private)
         exitMovie = 0
@@ -66,6 +67,7 @@ classdef MouseTrackerUnder2 < handle
                 end
             end
             if isempty(filename) || ~exist(filename) %a non-complete path was specified, and needs to be chosen
+                movie_folder = '~pwjones/Movies/mouse_training/';
                 [filename, movie_folder] = uigetfile([movie_folder '*.*']);
                 if filename == 0 % the user has canceled the file selection
                     return;
@@ -254,10 +256,11 @@ classdef MouseTrackerUnder2 < handle
             ah = axes('position', [.1, .1, .7 .8]);
             cm = colormap(hsv(this.nFrames));
             sorted_dir = sort(this.direction); %sorted vector for colormapping
-            pathIm = this.plotPaths()*255;
-            redIm = min(this.avgFrame + pathIm, 255);
-            blueIm = max(this.avgFrame - pathIm, 0);
-            bgIm = cat(3, blueIm, blueIm, redIm);
+            %pathIm = this.plotPaths()*255;
+            %redIm = min(this.avgFrame + pathIm, 255);
+            %blueIm = max(this.avgFrame - pathIm, 0);
+            %bgIm = cat(3, blueIm, blueIm, redIm);
+            bgIm = this.plotPathsOnBg();
             imshow(bgIm); hold on;
             %imshow(this.avgFrame); hold on;
             xlim([0 this.width]);
@@ -270,7 +273,7 @@ classdef MouseTrackerUnder2 < handle
                 ci = find(sorted_dir == this.direction(fi), 1, 'first');
                 if ~isnan(this.noseblob(fi))
                     line('Xdata', this.areas(fi,this.noseblob(fi)).Centroid(1), 'Ydata', ...
-                        this.areas(fi,this.noseblob(fi)).Centroid(2), 'Marker', '.', 'MarkerSize', 10, 'Color', 'r');
+                        this.areas(fi,this.noseblob(fi)).Centroid(2), 'Marker', '.', 'MarkerSize', 8, 'Color', 'b');
                 end
                 if ~isnan(ci)
                     %line('Xdata', this.COM(fi,1,1), 'Ydata', this.COM(fi,2,1), 'Marker', '.', 'MarkerSize', 10, 'Color', cm(ci,:));
@@ -279,8 +282,8 @@ classdef MouseTrackerUnder2 < handle
                 end
             end 
             % Make another graph with the color scale
-            fh2 = figure;
-            ah2 = axes('position', [.1 .1 .7 .8], 'visible', 'off');
+            %fh2 = figure;
+            %ah2 = axes('position', [.1 .1 .7 .8], 'visible', 'off');
             %cm = colormap(hsv(this.nFrames));
             %axes(ah2);
             %pcolor([sorted_dir(:), sorted_dir(:)]);
@@ -338,6 +341,7 @@ classdef MouseTrackerUnder2 < handle
         function showMovie(this, useBinMovie, frames)
             % function showMovie(this, useBinMovie, frameRange)
             fh = figure;
+            this.exitMovie = 0;
             set(fh, 'WindowKeyPressFcn', @this.exitMovieLoop);
             if ~exist('frames','var') || isempty(frames)
                 frames = 1:this.nFrames;
@@ -441,15 +445,14 @@ classdef MouseTrackerUnder2 < handle
                         end
                         this.nblobs(fi) = min(this.maxBlobs, length(temp_reg)); 
                         this.areas(segFrames(ii),1:this.nblobs(fi)) = temp_reg(1:this.nblobs(fi)); %only keep the top sized blobs
-                        temp_pos = [];
-                        for kk=1:this.nblobs(fi)
-                            temp_pos = cat(1, temp_pos, temp_reg(kk).PixelList);
-                            positions = permute(reshape([temp_reg(1:this.nblobs(fi)).Centroid], 2,[]), [3 1 2]);
-                            this.COM(fi, :, 1:this.nblobs(fi)) = positions;
-                            this.orient(fi, kk) = [this.areas(fi,kk).Orientation]./ 180 * pi; %this is the rough estimate
-                            
-                        end
-                        this.bodyCOM(fi, :) = mean(temp_pos);
+                        %temp_pos = [];
+                        %for kk=1:this.nblobs(fi)
+                        %    temp_pos = cat(1, temp_pos, temp_reg(kk).PixelList);
+                        %    positions = permute(reshape([temp_reg(1:this.nblobs(fi)).Centroid], 2,[]), [3 1 2]);
+                        %    this.COM(fi, :, 1:this.nblobs(fi)) = positions;
+                        %    this.orient(fi, kk) = [this.areas(fi,kk).Orientation]./ 180 * pi; %this is the rough estimate   
+                        %end
+                        %this.bodyCOM(fi, :) = mean(temp_pos);
                         this.detectTail(fi);
                         if (1 == 0) %debug plotting
                            bin_im = zeros(this.height, this.width); 
@@ -472,11 +475,38 @@ classdef MouseTrackerUnder2 < handle
                 frames = frames(1:this.nFrames); %just trim them off the end - this error only happens for last seg
                 this.trimFields(); %trim the object property arrays
             end
-            this.nosePos(frames, :) = this.findNose(frames);
-            this.bodyOrient(frames) = this.computeBodyOrientation(frames);    
-            
+            this.refineTracking(frames);    
         end
         
+        % ------------------------------------------------------------------------------------------------------
+        function refineTracking(this, frames)
+        % function refineTracking(this, frames)
+        %
+        % It makes sense to group these because they should all be performed together, and recomputed if the obh.
+            this.removeStaticObjects();
+            this.detectTail(frames);
+            this.bodyCOM(frames,:) = this.computeBodyPos(frames);
+            this.bodyOrient(frames) = this.computeBodyOrientation(frames);
+            this.nosePos(frames, :) = this.findNose(frames); 
+        end
+        
+        % ------------------------------------------------------------------------------------------------------
+        function bodyCOM = computeBodyPos(this, frames)
+            %
+            bodyCOM = NaN*zeros(length(frames), 2);
+            for i = 1:length(frames)
+                fi = frames(i);
+                temp_pos = [];
+                temp_areas = this.areas(fi,1:this.nblobs(fi));
+                for j=1:this.nblobs(fi)
+                    temp_pos = cat(1, temp_pos, temp_areas(j).PixelList);
+                    positions = permute(reshape([temp_areas(1:this.nblobs(fi)).Centroid], 2,[]), [3 1 2]);
+                    this.COM(fi, :, 1:this.nblobs(fi)) = positions;
+                    this.orient(fi, j) = [this.areas(fi,j).Orientation]./ 180 * pi; %this is the rough estimate
+                end
+                bodyCOM(i, :) = mean(temp_pos);
+            end
+        end
         % ------------------------------------------------------------------------------------------------------
         function orient = computeBodyOrientation(this, frames)
         % function [this, orient] = computeBodyOrientation(this, frames)
@@ -500,7 +530,11 @@ classdef MouseTrackerUnder2 < handle
                     bw2 = imdilate(bw,se);
                     propstr = {'Orientation'};
                     props = regionprops(bw2, propstr);
-                    orient(ii) = props.Orientation;
+                    if (~isempty(props))
+                        orient(ii) = props.Orientation;
+                    else 
+                        orient(ii) = NaN;
+                    end
                 end
             end
             %this.orient(frames) = orient;
@@ -683,6 +717,76 @@ classdef MouseTrackerUnder2 < handle
                 end
             end
         end
+        
+        % ------------------------------------------------------------------------------------------------------
+        function removeStaticObjects(this)
+            % function removeStaticObjects(this)
+            % 
+            % Goes through the areas field of detected objects and removes
+            % those that are similarly present for a significant number of
+            % frames.
+            limit = round(this.frameRate * 3); %X sec; number of frames necessary to be eliminated as static
+            dist_thresh = 1; %What do we call the same position, along each axis 
+            area_thresh = 15; %the amount that an area can change frame to frame to be counted as the same
+            abs_area_thresh = 50;
+            
+            this.blobsToDelete = [];
+            % First of all, go through and find the common positions
+            all_pos = [this.areas.Centroid];
+            all_pos = reshape(all_pos, 2, this.nFrames, this.maxBlobs); 
+            %all_pos = permute(all_pos, [2 3 1]);
+            %all_pos = permute(all_pos, [1 3 2]);
+            all_pos = reshape(all_pos, 2, []);
+            all_pos = all_pos';%makes it an blob*frame x 2 matrix
+            %all_pos = reshape(all_pos, 2, []);
+            %all_pos = reshape(all_pos, [], 2); 
+            nz = logical(all_pos(:,1)) | logical(all_pos(:,2)); %logical for indexing sample/blob
+            nzi = find(nz);
+            nz_pos = [all_pos(nz,1) all_pos(nz,2)];
+            distm = ipdm(nz_pos);
+            distm = distm + (dist_thresh+1)*eye(size(distm,1)); %makes the diagonal fall above thresh so that they aren't zero.
+            dist_sel = (distm <= dist_thresh); 
+            dist_rc = find(sum(dist_sel,2) > limit);
+            % let's also find an area difference to make sure they are the same blob
+            all_area = [this.areas.Area];
+            nz_area = all_area(nz);
+            area_diff = bsxfun(@minus, nz_area, nz_area');
+            area_diff = area_diff + eye(size(area_diff,1))*area_thresh; %again, offset the same area comparison
+            area_sel = (abs(area_diff) < area_thresh);
+            area_rc = find(sum(area_sel,2) > limit);
+            %absolute area
+            abs_area_rc = find(nz_area < abs_area_thresh);
+            
+            %Now, go through and find rows that are too populated
+            sel = dist_sel & area_sel;
+            rowcounts = sum(sel,2);
+            
+            static_rows = find(rowcounts > limit);
+            static_rows2 = intersect(dist_rc, area_rc);
+            static_rows2 = intersect(static_rows2, abs_area_rc);
+            
+            for i=1:length(static_rows2)
+                origi = nzi(static_rows2(i));
+                %framei = floor(origi/this.maxBlobs);
+                %blobi = origi - (framei*this.maxBlobs) + 1;
+                blobi = floor((origi-1)/this.nFrames) + 1;
+                framei = origi - ((blobi-1)*this.nFrames);
+                this.blobsToDelete(i,:) = [framei, blobi];
+                this.deleteArea(framei, blobi);
+                
+            end
+                
+        end
+        % =-------------------------------------------------------------------------------------------
+        function deleteArea(this, framei, blobi)
+           % function deleteArea(this, framei, blobi)
+           % 
+           % Just deletes the blob by saving an empty structre in its place
+           props = struct('Area',0, 'Centroid',[0 0],'BoundingBox', [0 0 0 0], 'MajorAxisLength',0,...
+                'MinorAxisLength',0, 'Orientation',0,'Extrema',[0 0 0 0], 'PixelIdxList',[], 'PixelList',[],'Perimeter', 0);
+           this.areas(framei,blobi) = props; 
+           this.nblobs(framei) = this.nblobs(framei)-1;
+        end
         % ------------------------------------------------------------------------------------------------------
         function clearCalcData(this)
          % function clearCalcData(this)
@@ -701,7 +805,7 @@ classdef MouseTrackerUnder2 < handle
             this.bodyCOM = NaN*zeros(this.nFrames, 2);
             %initialize areas - must get these in the correct order too
             tempareas = struct('Area',0, 'Centroid',[0 0],'BoundingBox', [0 0 0 0], 'MajorAxisLength',0,...
-                'MinorAxisLength',0, 'Orientation',0,'Extrema',[0 0 0 0], 'PixelIdxList',[], 'PixelList',1,'Perimeter', 0);
+                'MinorAxisLength',0, 'Orientation',0,'Extrema',[0 0 0 0], 'PixelIdxList',[], 'PixelList',[],'Perimeter', 0);
             this.areas = repmat(tempareas, this.nFrames, this.maxBlobs); % make a struct arraay length of nFrames
 %             tempareas = regionprops(im2bw(this.avgFrame, graythresh(this.avgFrame)), this.regprops); %built-in that gives stats on binary/gray images
 %             tempareas = tempareas(1);
@@ -714,7 +818,30 @@ classdef MouseTrackerUnder2 < handle
          % Clears the path data
             this.paths = [];
         end
+        % ------------------------------------------------------------------------------------------------------ 
+        function detectPaths(this, time, absoluteTime, useAvgFrame)
+            % Essentially just calls detectEdgesInFrame twice, once for
+            % each path, and saves the results
+            pb = 1;
             
+            [rew_path, rew_image] = detectEdgesInFrame(this, time, absoluteTime, useAvgFrame);
+            [distract_path, distract_image] = detectEdgesInFrame(this, time, absoluteTime, useAvgFrame);
+            
+            paths = [rew_path; distract_path];
+            this.paths = paths;
+            
+            if (pb)
+                order = [2 1 3];
+                r = this.avgFrame; g = this.avgFrame; b = this.avgFrame;
+                r(distract_image) = 255; g(distract_image) = 0; b(distract_image) = 0;
+                r(rew_image) = 0; g(rew_image) = 255; b(rew_image) = 0;
+                colorim = cat(3, r, g, b);
+                figure;
+                imshow(colorim);
+                hold on;
+            end
+            
+        end
         % ------------------------------------------------------------------------------------------------------
         function [e, eimage] = detectEdgesInFrame(this, time, absoluteTime, useAvgFrame)
             % function e = detectEdgesInFrame(this, time, absoluteTime)
@@ -725,6 +852,8 @@ classdef MouseTrackerUnder2 < handle
             
             EDGE_LEN_THRESH = 20;
             disk_size = 20;
+            pb = 0;
+            % choose the image to use, then adjust to maximize contrast
             if (isempty(useAvgFrame))
                 useAveFrame = 0;
             end
@@ -741,39 +870,26 @@ classdef MouseTrackerUnder2 < handle
             else
                 gf = this.avgFrame;
             end
-            %gf = 255 - gf; %invert the image
-            
-            % Filter out the background in order to detect sharp changes
-%             sigma = 25;
-%             h = fspecial('gaussian', 6*sigma, sigma);
-%             background = imfilter(gf, h);
-%             gf = gf - background;
-            % adjust the image to take the whole range
             mingf = double(min(gf(:))); maxgf = double(max(gf(:)));
             gf = imadjust(gf, [mingf/255; maxgf/255], [0; 1]);
-            %background = imopen(gf,strel('disk', disk_size)); %finds a background via opening of the grayscale image
-            %gf2 = gf-background;
             
-            % this step is to get rid of the bright highlights in the image.
-            %medgf = median(double(gf(:))) + 30;
-            %i = gf > medgf;
-            %gf(i) = medgf;
-            
-            %ei = edge(gf2, 'canny');
-            %ei = imfill(ei, 'holes');
-            figure; imshow(gf);
+            % get user input about which lines they want to be marked
+            fh = figure; imshow(gf);
             [cx, cy] = ginput; %get 2 points from user interaction
+            close(fh);
             
-            ei = edge(gf, 'canny');
-            ei = imclose(ei, strel('square', 3));
+            ei = edge(gf, 'canny'); %first detect edges
+            ei = imclose(ei, strel('square', 3)); %morphological close, fills in small (1px) gaps
             %ei = imfill(ei);
             props = {'Area', 'PixelIdxList', 'PixelList'};
-            e = regionprops(ei, props);
+            e = regionprops(ei, props); %gets the binary regions defined by the edges
+            % eliminate the short edges
             ea = [e.Area];
-            long = ea >= EDGE_LEN_THRESH;
+            long = ea >= EDGE_LEN_THRESH; 
             e = e(long);
             ea = ea(long);
             [~, order] = sort(ea); e = e(order); %sort by area
+            
             %find areas where we've clicked
             p = round([cx(:), cy(:)]); %clicked points
             match = zeros(length(e),1); %areas that have been matched
@@ -786,18 +902,24 @@ classdef MouseTrackerUnder2 < handle
                     end
                 end
             end
-            e = e(match == 1); %only keep areas that have been matched
+            e = e(match == 1); % only keep areas that have been matched
+            e = mergeAreas(e); % want this user interaction to result in a single area
             
-            % Make a new image from only those
-            ei = zeros(size(ei));
-            for ii=1:length(e)
-                ei(e(ii).PixelIdxList) = 1;
+            if (pb)
+                hold on;
+                overlay = gf;
+                neg = gf;
+                overlay(e.PixelIdxList) = 255;
+                neg(e.PixelIdxList) = 0;
+                colorim = cat(3, overlay, neg, neg);
+                imshow(colorim);
             end
-            eimage = (ei==1);
-            eimage = imclose(eimage, strel('square', 5));
+            % This is the returned binary image
+            eimage = false(size(ei));
+            eimage(e.PixelIdxList) = 1; 
+            %eimage = imclose(eimage, strel('square', 5));
             
-            this.paths = e;
-            %traces = bwtraceboundary(eimage, p, 'e');
+            %this.paths = e;
         end
         % ------------------------------------------------------------------------------------------------------
         function pathIm = plotPaths(this)
@@ -809,16 +931,66 @@ classdef MouseTrackerUnder2 < handle
                 pathIm(path.PixelIdxList) = 1;
             end
         end
-        
         % ------------------------------------------------------------------------------------------------------
-        function noseDist = noseDistToTrail(this, frames)
+        function pathIm = plotPathsOnBg(this, pathNums)
+            if (~exist('pathNums','var'))  
+                pathNums = 1:length(this.paths);
+            elseif(~isempty(pathNums)) %if we're given a set of paths, use that, otherwise plot all of them
+                pathNums = intersect(1:length(this.paths), pathNums); %make sure we don't try to plot anything not there
+            else
+                pathNums = 1:length(this.paths);
+            end
+            pathIm = cat(3, this.avgFrame, this.avgFrame, this.avgFrame);
+            color_order = [2 1 3];
+            for ii = 1:length(pathNums)
+                %set color layer to 255
+                pi = pathNums(ii);
+                c = color_order(mod(pi-1, 3)+1);
+                layer = pathIm(:,:,c);
+                layer(this.paths(pi).PixelIdxList) = 255;
+                pathIm(:,:,c) = layer;
+                oc = find(1:3 ~= c);
+                %set the other layers to 0
+                layer = pathIm(:,:,oc(1));
+                layer(this.paths(pi).PixelIdxList) = 0;
+                pathIm(:,:,oc(1)) = layer;
+                layer = pathIm(:,:,oc(2));
+                layer(this.paths(pi).PixelIdxList) = 0;
+                pathIm(:,:,oc(2)) = layer;
+            end
+        end
+        % ------------------------------------------------------------------------------------------------------
+        function refinePaths(this, pathNum)
+            % function removePaths(this)
+            %
+            % This pops up the background with paths plotted on it (the path specified)
+            % so that the user can remove portions of it.
+            fh = figure;
+            set(fh, 'WindowKeyPressFcn', @this.exitMovieLoop);
+            this.exitMovie = 0;
+            while(~this.exitMovie)
+                imshow(this.plotPathsOnBg(pathNum));
+                del_poly = impoly(gca);
+                del_roi = del_poly.createMask();
+                del_i = find(del_roi);
+                path_i = this.paths(pathNum).PixelIdxList;
+                [keep, ki] = setdiff(path_i, del_i);
+                this.paths(pathNum).PixelList = this.paths(pathNum).PixelList(ki,:);
+                this.paths(pathNum).PixelIdxList = keep;
+                this.paths(pathNum).Area = length(keep);   
+            end 
+            imshow(this.plotPathsOnBg([]));
+        end
+        % ------------------------------------------------------------------------------------------------------
+        function noseDist = noseDistToTrail(this, frames, pathNum)
         % function noseDist = noseDistToTrail(this, frames)
         % 
         % returns the distances for the nose position to the closest point of trail
         % for each of the frames specified
-            if (~isempty(this.paths))
+            
+            if (length(this.paths) >= pathNum)
                 nosePos = this.nosePos(frames,:);
-                trailPos = this.paths(1).PixelList;
+                trailPos = this.paths(pathNum).PixelList;
                 distm = ipdm(nosePos, trailPos);
                 noseDist = nanmin(distm, [], 2);
             else
@@ -834,12 +1006,15 @@ classdef MouseTrackerUnder2 < handle
         %
         % Return the percentage of the time period given that the mouse 
         % was within the threshold distance from the trail.
-            traillNum = 1; % Eventually we need 2+ trails
+            %traillNum = 1; % Eventually we need 2+ trails
             if nargin < 4 %default distance
                 threshDist = 10;
             end
+            if isempty(frames)
+                frames = 1:this.nFrames;
+            end
             pTime = 0; %default return value
-            dists = this.noseDistToTrail(frames);
+            dists = this.noseDistToTrail(frames, trailNum);
             nn = ~isnan(dists);
             nnframes = frames(nn);
             dists = dists(nn);
@@ -864,7 +1039,7 @@ classdef MouseTrackerUnder2 < handle
             distTraveled = [];
             frameNums = [];
             
-            dists = this.noseDistToTrail(frames);
+            dists = this.noseDistToTrail(frames, trailNum);
             nn = ~isnan(dists);
             nnframes = frames(nn);
             dists = dists(nn);
@@ -888,18 +1063,28 @@ classdef MouseTrackerUnder2 < handle
         end
         % ------------------------------------------------------------------------------------------------------
         function showFrame(this, framei, useBinMovie)
-        % function showFrame(this, framei, useBinMovie)
-        % 
-        % plots a frame of the movie, 
+            % function showFrame(this, framei, useBinMovie)
+            %
+            % plots a frame of the movie,
+            dbg = 0;
             if useBinMovie
                 bf = zeros(this.height, this.width, 'uint8');
                 for jj=1:size(this.areas,2);
                     on = this.areas(framei,jj).PixelIdxList;
                     bf(on) = 1;
                 end
+                %also, need to highlight any areas to delete
+                if dbg
+                    fi = find(this.blobsToDelete(:,1) == framei);
+                    for jj = 1:length(fi)
+                        on = this.areas(this.blobsToDelete(fi(jj),1),this.blobsToDelete(fi(jj),2)).PixelIdxList;
+                        bf(on) = bf(on)+jj;
+                    end
+                end
                 pathIm = this.plotPaths()*4;
                 bf = bf+pathIm;
-                imshow(bf, [0 0 0; 1 1 1; 1 0 0; 0 0 1; 1 1 1; 1 0 0]); hold on;  
+                imshow(label2rgb(bf, 'cool','k')); hold on;
+                %imshow(bf, [0 0 0; 1 1 1; 1 0 0; 0 0 1; 1 1 1; 1 0 0]); hold on;  
             else
                 %f = mmread(this.videoFN, this.frameRange(framei));
                 %f = this.readFrames(framei);
@@ -932,14 +1117,16 @@ classdef MouseTrackerUnder2 < handle
             end
         end
         
+        
         % ------------------------------------------------------------------------------------------------------
+        %           
         function res = readFrames(this, frames, flag)
         % function vid_struct = readFrames(this, frames, flag)
         % 
         % Flag specifies if the reading is a SINGLE frame, a CONTINUOUS range, or a DISCONTINUOUS set of frames
-            adjFrames = frames+this.frameRange(1)-1;
+            adjFrames = frames+double(this.frameRange(1))-1;
             if strcmp(flag, 'single')
-                res = this.readerObj.read(adjframes(1));
+                res = this.readerObj.read(adjFrames(1));
                 res = squeeze(res(:,:,1));
             elseif strcmp(flag,'continuous')
                 res = this.readerObj.read(adjFrames);
@@ -948,13 +1135,13 @@ classdef MouseTrackerUnder2 < handle
                 totalFrames = sum(diff(frames')'+1);
                 res = zeros(this.height, this.width, totalFrames); %4D matrix
                 res_ind=0;
-                for ii = 1:size(frames,1) %loop that reads
-                    ind_n = frames(ii,2)-frames(ii,1)+1;
+                for ii = 1:size(adjFrames,1) %loop that reads
+                    ind_n = adjFrames(ii,2)-adjFrames(ii,1)+1;
                     inds = (1:ind_n) + res_ind;
                     res_ind = inds(end);
-                    fi = frames(ii,:);
+                    fi = adjFrames(ii,:);
                     if ind_n == 1
-                        fi = frames(ii,1);
+                        fi = adjFrames(ii,1);
                     end
                     temp = this.readerObj.read(fi);
                     res(:,:,inds) = squeeze(temp(:,:,1,:));
@@ -1042,7 +1229,7 @@ classdef MouseTrackerUnder2 < handle
             if(boostContrast)
                 new_mov = increaseMovContrast(new_mov);
             end
-            thresh = .2; %this seems to work after image normalization
+            thresh = .14; %this seems to work after image normalization
             if binary
                 ret_mov = false(size(new_mov));
                 nFrames = size(ret_mov,3);
