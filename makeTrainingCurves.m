@@ -11,6 +11,7 @@ vid_list = '3090files.txt';
 %hist_trial_range = [1:10; 60:69];
 %hist_trial_range = [1:20; 115:134];
 hist_trial_range = [2:7; 2:7];
+hist_trial_range = [35:49; 20:34];
 
 %%%%%%%%%%%%%%%% Start in on doing things  %%%%%%%%%%%%%%%%
 fid = fopen(vid_list, 'r');

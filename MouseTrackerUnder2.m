@@ -8,7 +8,9 @@ classdef MouseTrackerUnder2 < handle
         framesPerSeg = 200 %the # of frames read at one time
         avgSubsample = 60 %sample every X frames to make the average
         width % movie dimensions
-        height 
+        nativeWidth
+        height
+        nativeHeight
         crop % number of pixels trimmed from each side of movie
         frameRate %fps
         totalDuration %total length of the movie, sec
@@ -22,7 +24,7 @@ classdef MouseTrackerUnder2 < handle
         noseblob %the index of the nose blob for each frame
         COM % center of mass for each blob
         bodyCOM %center of mass of all blobs combined
-        bodyOrient %the orientation of the entire body (minus tail)
+        bodyOrient %the orientation of the entire body (minus tail), in radians 0-360
         orient % orientation of each blob
         vel % velocity of each blob
         bodyVel
@@ -91,8 +93,8 @@ classdef MouseTrackerUnder2 < handle
                 %vid_struct = mmread(this.videoFN, 1); 
                 %vid_struct = vid_struct(1); %sometimes returning as array.  Weird.
                 this.frameRate = this.readerObj.FrameRate;
-                this.width = this.readerObj.Width;
-                this.height = this.readerObj.Height;
+                this.nativeWidth = this.readerObj.Width;
+                this.nativeHeight = this.readerObj.Height;
 
                 if (nargin > 3) %there is a crop vector present
                     this.crop = varargin{4};
@@ -100,6 +102,8 @@ classdef MouseTrackerUnder2 < handle
                     this.height = this.readerObj.height - sum(this.crop(3:4));
                 else
                     this.crop = [ 0 0 0 0];
+                    this.width = this.nativeWidth;
+                    this.height = this.nativeHeight;
                 end
 
                 % figure out the range of frames to be considered
@@ -161,7 +165,7 @@ classdef MouseTrackerUnder2 < handle
             if isnan(vel)
                 this.mousePosition(time_range);
             end
-            [this, vel] = this.computeVelocity(frames);
+            vel = this.computeVelocity(frames);
         end
         
         % ----------------------------------------------------------------------------------------------------
@@ -250,9 +254,8 @@ classdef MouseTrackerUnder2 < handle
             end 
         end
         
-        
         % ------------------------------------------------------------------------------------------------------
-        function plotDirection(this, frames)
+        function plotNosePosition(this, frames)
             % function plotDirection(this, frames)
             plotblue = [.3, .6, 1]; % a nice blue color
             if ~exist('frames', 'var') || isempty(frames); frames = 1:this.nFrames; end
@@ -287,19 +290,65 @@ classdef MouseTrackerUnder2 < handle
             end 
             title(this.videoFN);
             % Make another graph with the color scale
-            %fh2 = figure;
-            %ah2 = axes('position', [.1 .1 .7 .8], 'visible', 'off');
-            %cm = colormap(hsv(this.nFrames));
-            %axes(ah2);
-            %pcolor([sorted_dir(:), sorted_dir(:)]);
-            %line('parent', ah2, 'ydata', sorted_dir, 'xdata', 1:length(sorted_dir)); 
-            %colorbar;
+%             fh2 = figure;
+%             ah2 = axes('position', [.1 .1 .7 .8], 'visible', 'off');
+%             cm = colormap(hsv(this.nFrames));
+%             axes(ah2);
+%             pcolor(repmat(sorted_dir(:), [1 3]));
+% %             line('parent', ah2, 'ydata', sorted_dir, 'xdata', 1:length(sorted_dir)); 
+%             colorbar;
         end
         
+        % ------------------------------------------------------------------------------------------------------
+        function plotDirection(this, frames)
+            % function plotDirection(this, frames)
+            plotblue = [.3, .6, 1]; % a nice blue color
+            if ~exist('frames', 'var') || isempty(frames); frames = 1:this.nFrames; end
+            fh = figure;
+            ah = axes('position', [.1, .1, .7 .8]);
+            cm = colormap(hsv(this.nFrames));
+            sorted_dir = sort(this.direction); %sorted vector for colormapping
+            %pathIm = this.plotPaths()*255;
+            %redIm = min(this.avgFrame + pathIm, 255);
+            %blueIm = max(this.avgFrame - pathIm, 0);
+            %bgIm = cat(3, blueIm, blueIm, redIm);
+            bgIm = this.plotPathsOnBg();
+            imshow(bgIm); hold on;
+            %imshow(this.avgFrame); hold on;
+            xlim([0 this.width]);
+            ylim([0 this.height]);
+            % unfortunately, I haven't been able to figure out an easier way to do colormapping of points plotted over
+            % a B&W image, without the points and the image sharing the same colormap.  So, here I'm just plotting every
+            % point separately, with a color indicative of the velocity of the animal.
+            for ii=1:length(frames)
+                fi = frames(ii);
+                ci = find(sorted_dir == this.direction(fi), 1, 'first');
+                if ~isnan(this.noseblob(fi))
+                    line('Xdata', this.areas(fi,this.noseblob(fi)).Centroid(1), 'Ydata', ...
+                        this.areas(fi,this.noseblob(fi)).Centroid(2), 'Marker', '.', 'MarkerSize', 8, 'Color', cm(ci,:));
+                end
+                if ~isnan(ci)
+                    %line('Xdata', this.COM(fi,1,1), 'Ydata', this.COM(fi,2,1), 'Marker', '.', 'MarkerSize', 10, 'Color', cm(ci,:));
+                    %line('Xdata', this.COM(fi,1,1), 'Ydata', this.COM(fi,2,1), 'Marker', '.', 'MarkerSize', 10, 'Color', 'r');
+                    %line('parent', ah2, 'Xdata', this.COM(ii,1), 'Ydata', this.COM(ii,2), 'Marker', '.', 'MarkerSize', 10, 'Color', cm(ci,:));
+                end
+            end 
+            title(this.videoFN);
+            % Make another graph with the color scale
+            fh2 = figure;
+            ah2 = axes('position', [.1 .1 .7 .8], 'visible', 'off');
+            cm = colormap(hsv(this.nFrames));
+            axes(ah2);
+            pcolor(repmat(sorted_dir(:), [1 3]));
+%             line('parent', ah2, 'ydata', sorted_dir, 'xdata', 1:length(sorted_dir)); 
+            colorbar;
+        end
+        
+        % ---------------------------------------------------------------------------
         function plotFollowing(this, frames, dist_thresh, textflag)
             % plot the following segments based on the following information 
             [dists, fframes] = this.distanceOnTrail(frames,1,dist_thresh);
-            this.plotDirection; hold on;
+            this.plotNosePosition(frames); hold on;
             for i=1:size(fframes,1)
                 range = fframes(i,1):fframes(i,2);
                 np = this.nosePos(range, :);
@@ -310,10 +359,11 @@ classdef MouseTrackerUnder2 < handle
             end
         end
         
+        % ---------------------------------------------------------------------------
         function plotFollowingSide(this, frames, dist_thresh, textflag)
             % plot the following segments based on the following information 
             [dists, fframes] = this.distanceOnTrail(frames,1,dist_thresh);
-            this.plotDirection; hold on;
+            this.plotNosePosition; hold on;
             for i=1:size(fframes,1)
                 range = fframes(i,1):fframes(i,2);
                 np = this.nosePos(range, :);
@@ -329,6 +379,7 @@ classdef MouseTrackerUnder2 < handle
             end
         end
         
+        % ---------------------------------------------------------------------------
         function plotOrientation(this, frames)
             % function plotVelocity(this)
             if ~exist('frames', 'var') || isempty(frames); frames = 1:this.nFrames; end
@@ -360,14 +411,17 @@ classdef MouseTrackerUnder2 < handle
         end
         
         % ------------------------------------------------------------------------------------------------------
-        function writeMovie(this, filename, useBinMovie)
+        function writeMovie(this, filename, movieType, frames, dispCrop)
             % function writeMovie(this, filename)
             % Writes a movie of the tracked mouse to disk at the given location
-            vidWriter = VideoWriter(filename);
+            if isempty(frames)
+                frames = 1:this.nFrames;
+            end
+            vidWriter = VideoWriter(filename, 'Motion JPEG AVI');
             open(vidWriter);
             figure;
-            for ii=1:this.nFrames
-                this.showFrame(ii, useBinMovie);
+            for ii=frames
+                this.showFrame(ii, movieType, dispCrop);
                 currFrame = getframe; % now to the business of writing the movie
                 writeVideo(vidWriter,currFrame);
                 hold off;
@@ -376,7 +430,7 @@ classdef MouseTrackerUnder2 < handle
         end
         
         % ------------------------------------------------------------------------------------------------------
-        function showMovie(this, useBinMovie, frames)
+        function showMovie(this, movieType, frames, dispCrop)
             % function showMovie(this, useBinMovie, frameRange)
             fh = figure;
             this.exitMovie = 0;
@@ -389,7 +443,7 @@ classdef MouseTrackerUnder2 < handle
                 if this.exitMovie
                     break
                 end
-                this.showFrame(fi, useBinMovie);
+                this.showFrame(fi, movieType, dispCrop);
                 hold off;
                 pause(1/this.frameRate/1); %faster than the natural framerate due to impatience.
             end
@@ -419,10 +473,10 @@ classdef MouseTrackerUnder2 < handle
             disp(['Saved object in ' full_fn]);
         end
         
-        function mov = returnFrames(this, frames, flag, binary)
+        function mov = returnFrames(this, frames, movieType)
             % mov = returnFrames(this, frames, binary)
             % returns the frames of the movie specified, binary or greyscale
-            mov = this.readMovieSection(frames, flag, binary);
+            mov = this.readMovieSection(frames, movieType);
             
         end
         
@@ -448,7 +502,7 @@ classdef MouseTrackerUnder2 < handle
                 segFrames = frames(first:last);
                 
                 disp(['Finding mouse in segment ' num2str(jj)]);
-                frameArray = this.readMovieSection(segFrames,1);
+                frameArray = this.readMovieSection(segFrames,'bin');
                 segFrames = segFrames(1:size(frameArray, 3));
                 newFrameCount(jj) = this.nFrames;
                 trimmed(jj) = 0; 
@@ -525,6 +579,7 @@ classdef MouseTrackerUnder2 < handle
             this.detectTail(frames);
             this.bodyCOM(frames,:) = this.computeBodyPos(frames,0);
             this.bodyOrient(frames) = this.computeBodyOrientation(frames);
+            this.bodyOrient(frames) = this.fixOrientation(frames); %this should straighten out the orientations
             this.nosePos(frames, :) = this.findNose(frames); 
             this.vel(frames, :) = this.computeVelocity(frames);
         end
@@ -541,11 +596,12 @@ classdef MouseTrackerUnder2 < handle
                 temp_pos = [];
                 temp_areas = this.areas(fi,1:this.nblobs(fi));
                 for j=1:this.nblobs(fi)
+                    this.orient(fi, j) = [this.areas(fi,j).Orientation]./ 180 * pi; %this is the rough estimate
                     if (includeTail) || (j ~= taili) %exclude the tail in the body position calculation
                         temp_pos = cat(1, temp_pos, temp_areas(j).PixelList);
                         positions = permute(reshape([temp_areas(1:this.nblobs(fi)).Centroid], 2,[]), [3 1 2]);
                         this.COM(fi, :, 1:this.nblobs(fi)) = positions;
-                        this.orient(fi, j) = [this.areas(fi,j).Orientation]./ 180 * pi; %this is the rough estimate
+                        %this.orient(fi, j) = [this.areas(fi,j).Orientation]./ 180 * pi; %this is the rough estimate
                     end
                 end
                 bodyCOM(i, :) = mean(temp_pos);
@@ -557,7 +613,8 @@ classdef MouseTrackerUnder2 < handle
         function orient = computeBodyOrientation(this, frames)
         % function [this, orient] = computeBodyOrientation(this, frames)
         %
-        % The idea here is to fill in the body space using dilation of the 
+        % The idea here is to fill in the body space using dilation of the individual body blobs (excluding tail)
+        % in order to get a reading of the animal orientation.
             se = strel('disk',20);
             orient = NaN*zeros(length(frames),1);
             for ii=1:length(frames)
@@ -577,7 +634,7 @@ classdef MouseTrackerUnder2 < handle
                     propstr = {'Orientation'};
                     props = regionprops(bw2, propstr);
                     if (~isempty(props))
-                        orient(ii) = props.Orientation;
+                        orient(ii) = props(1).Orientation ./ 180 .* pi;
                     else 
                         orient(ii) = NaN;
                     end
@@ -598,14 +655,15 @@ classdef MouseTrackerUnder2 < handle
             %COM = this.nosePos(frames,:);
             diff_com = diff(COM, 1, 1); %differences in COM for each x,y position
             dists = [sqrt(sum(COM(1,:).^2, 2)); sqrt(sum(diff_com.^2, 2))]; %euclidian distances of each frame transition
-            this.vel(frames) = dists * this.frameRate; % Velocities in px/sec
+            %this.vel(frames) = dists * this.frameRate; % Velocities in px/sec
+            this.vel(frames) = dists;
             vel = this.vel(frames);
             diff_com = [COM(1,:); diff_com]; % add the first position to get an equal sized vector
             this.direction(frames) = cart2pol(diff_com(:,1), diff_com(:,2)); %this is the direction of motion
         end
         
         % ------------------------------------------------------------------------------------------------------
-        function [this, orientation] = computeOrientation(this, frames)
+        function orientation = fixOrientation(this, frames)
             % What we need to do from the ellipse orientation is to figure out the head direction
             %diffi = find(abs(this.orient(frames,:) - this.direction(frames, :)) > pi/2);
             
@@ -614,81 +672,82 @@ classdef MouseTrackerUnder2 < handle
             
             %for frames with visible tail
             tp = [this.tailVisible];
-            tp(:) = 0; %let's avoid some issues for now
-            tp = (tp ==1); %make it into a logical array
+            tp = logical(tp);
+            %tp(:) = 0; %let's avoid some issues for now
+            %tp = (tp ==1); %make it into a logical array
             tp = tp(frames);
-            if(tp)
+            if(sum(tp))
                 ntf = length(frames(tp));
                 ftp = frames(tp);
                 tailCOM = zeros(ntf,2);
                 for ii = 1:ntf
-                    tailCOM(ii,:) = this.areas(ftp(ii)).tailCOM;
+                    taili = this.tailblob(ftp(ii));
+                    tailCOM(ii,:) = this.areas(ftp(ii), taili).Centroid;
                 end
-                tailV = tailCOM - this.COM(frames(tp),:); %vector towards the tail
+                tailV = tailCOM - this.bodyCOM(ftp,:); %vector towards the tail
                 [theta, rho] = cart2pol(tailV(:,1), tailV(:,2));
                 %we want these to be close, the opposite of the tail vector and the orientation
-                od = circularDistance(this.orient(ftp), theta+pi); 
+                od = circularDistance(this.bodyOrient(ftp), theta+pi); 
                 dif = abs(od) > pi/2;  % these estimates are way off, so rotate them 180deg
-                this.orient(ftp(dif)) = mod(this.orient(ftp(dif)) + pi, 2*pi);
+                this.bodyOrient(ftp(dif)) = mod(this.bodyOrient(ftp(dif)) + pi, 2*pi);
                 switchedframes = ftp(dif);
                 for ii=1:length(switchedframes) %propogate that change
                     startf = switchedframes(ii);
                     frame = min(startf+1, this.nFrames);
-                    odf = abs(circularDistance(this.orient(startf), this.orient(frame)));
+                    odf = abs(circularDistance(this.bodyOrient(startf), this.bodyOrient(frame)));
                     while(odf > pi/2)
-                        this.orient(frame) = mod(this.orient(frame) + pi, 2*pi); %rotate 180deg
+                        this.bodyOrient(frame) = mod(this.bodyOrient(frame) + pi, 2*pi); %rotate 180deg
                         prev = frame;
                         frame = min(frame+1, this.nFrames);
-                        odf = abs(circularDistance(this.orient(prev), this.orient(frame)));
+                        odf = abs(circularDistance(this.bodyOrient(prev), this.bodyOrient(frame)));
                     end
                     % now propogate change in the opposite direction
                     startf = switchedframes(ii);
                     frame = max(1, startf-1);
-                    odf = abs(circularDistance(this.orient(startf), this.orient(frame)));
+                    odf = abs(circularDistance(this.bodyOrient(startf), this.bodyOrient(frame)));
                     while(odf > pi/2)
-                        this.orient(frame) = mod(this.orient(frame) + pi, 2*pi); %rotate 180deg
+                        this.bodyOrient(frame) = mod(this.bodyOrient(frame) + pi, 2*pi); %rotate 180deg
                         prev = frame;
                         frame = max(frame-1, 1);
-                          odf = abs(circularDistance(this.orient(prev), this.orient(frame)));
+                          odf = abs(circularDistance(this.bodyOrient(prev), this.bodyOrient(frame)));
                     end
                 end
 
                 vel_thresh = nanmax(this.vel(2:end)/2);
-                vel_thresh = 300;
+                vel_thresh = 200;
                 tp = this.vel(2:end) > vel_thresh;  % %threshold in px/sec
-                tp = logical([0; tp]);
+                tp = logical([0; tp(:)]);
                 tp = tp(frames);
                 ntf = length(frames(tp));
                 ftp = frames(tp);
                 vel_v = this.direction(ftp);
-                od = circularDistance(this.orient(ftp), vel_v); %we want these to be close
+                od = circularDistance(this.bodyOrient(ftp), vel_v); %we want these to be close
                 dif = abs(od) > pi/2;  % these estimates are way off, so rotate them 180deg
-                this.orient(ftp(dif)) = mod(this.orient(ftp(dif)) + pi, 2*pi);
+                this.bodyOrient(ftp(dif)) = mod(this.bodyOrient(ftp(dif)) + pi, 2*pi);
                 switchedframes = ftp(dif);
                 for ii=1:length(switchedframes) %propogate that change
                     startf = switchedframes(ii);
                     frame = min(startf+1, this.nFrames);
-                    odf = abs(circularDistance(this.orient(startf), this.orient(frame)));
+                    odf = abs(circularDistance(this.bodyOrient(startf), this.bodyOrient(frame)));
                     while(odf > pi/2)
-                        this.orient(frame) = mod(this.orient(frame) + pi, 2*pi); %rotate 180deg
+                        this.bodyOrient(frame) = mod(this.bodyOrient(frame) + pi, 2*pi); %rotate 180deg
                         prev = frame;
                         frame = min(frame+1, this.nFrames);
-                        odf = abs(circularDistance(this.orient(prev), this.orient(frame)));
+                        odf = abs(circularDistance(this.bodyOrient(prev), this.bodyOrient(frame)));
                     end
                     % now propogate change in the opposite direction
                     startf = switchedframes(ii);
                     frame = max(1, startf-1);
-                    odf = abs(circularDistance(this.orient(startf), this.orient(frame)));
+                    odf = abs(circularDistance(this.bodyOrient(startf), this.bodyOrient(frame)));
                     while(odf > pi/2)
-                        this.orient(frame) = mod(this.orient(frame) + pi, 2*pi); %rotate 180deg
+                        this.bodyOrient(frame) = mod(this.bodyOrient(frame) + pi, 2*pi); %rotate 180deg
                         prev = frame;
                         frame = max(frame-1, 1);
-                          odf = abs(circularDistance(this.orient(prev), this.orient(frame)));
+                          odf = abs(circularDistance(this.bodyOrient(prev), this.bodyOrient(frame)));
                     end
                 end
-
-                 orientation = this.orient(frames);
             end
+            orientation = this.bodyOrient(frames);
         end
         
         % ------------------------------------------------------------------------------------------------------
@@ -713,6 +772,7 @@ classdef MouseTrackerUnder2 < handle
             this.noseblob = this.noseblob(1:this.nFrames,:);
             this.tailblob = this.tailblob(1:this.nFrames,:);
             this.tailVisible = this.tailVisible(1:this.nFrames);
+            this.bodyOrient= this.bodyOrient(1:this.nFrames,:);
             this.orient= this.orient(1:this.nFrames,:,:);
             this.vel = this.vel(1:this.nFrames,:);
             this.direction= this.direction(1:this.nFrames,:);
@@ -1083,16 +1143,19 @@ classdef MouseTrackerUnder2 < handle
         end
         % ------------------------------------------------------------------------------------------------------
         function [noseDist, vects, ret_frames] = noseDistToTrail(this, frames, pathNum, varargin)
-        % function noseDist = noseDistToTrail(this, frames)
+        % function noseDist = noseDistToTrail(this, frames, pathNum, varargin)
         % 
         % returns the distances for the nose position to the closest point of trail
-        % for each of the frames specified
+        % for each of the frames specified.
+        % frames - the frames to be considered
+        % pathNum - path number, generally 1 for rewarded, 2 for unrewarded
+        % varargin - 1) the threshold distance for which to return the frames where the distance is within.
             
             if (length(this.paths) >= pathNum)
                 nosePos = this.nosePos(frames,:);
                 trailPos = this.paths(pathNum).PixelList;
-                distm = ipdm(single(trailPos),single(nosePos));
-                [noseDist, mini] = nanmin(distm, [], 1);
+                distm = ipdm(single(nosePos), single(trailPos));
+                [noseDist, mini] = nanmin(distm, [], 2);
                 closestTrailP = trailPos(mini, :);
                 vects = closestTrailP - nosePos;
             else
@@ -1139,7 +1202,7 @@ classdef MouseTrackerUnder2 < handle
         %
             headingVect = this.nosePos(frames,:) -  this.bodyCOM(frames,:);
             theta = cart2pol(headingVect(:,1), headingVect(:,2));
-            this.bodyOrient(frames) = theta;
+            %this.bodyOrient(frames) = theta;
             headingVect = theta;
         end
         
@@ -1149,10 +1212,10 @@ classdef MouseTrackerUnder2 < handle
         %
         % Let's put several pieces together
             [noseDist, vects, ~] = this.noseDistToTrail(frames, pathNum);
-            orthoTheta = cart2pol(vects(:,1), vects(:,2));
-            headingTheta = this.headingFromBodyToNose(frames);
-            rotations = headingTheta - orthoTheta;
-            negi = rotations < 0;
+            orthoTheta = mod(cart2pol(vects(:,1), vects(:,2)),2*pi);
+            headingTheta = mod(this.headingFromBodyToNose(frames),2*pi);
+            rotations = mod(headingTheta - orthoTheta, 2*pi);
+            negi = rotations > pi;
             dists = noseDist;
             dists(negi) = -1*dists(negi); %switch the sign of some
             
@@ -1194,11 +1257,15 @@ classdef MouseTrackerUnder2 < handle
         end
         
         % ---------------------------------------------------------------------------------------------------
-        function [distTraveled, frameNums] = distanceOnTrail(this, frames, trailNum, threshDist)
+        function [distTraveled_ret, frameNums_ret] = distanceOnTrail(this, frames, trailNum, threshDist)
         % function [dists, frames] = distanceOnTrail(this, frames, threshDist) 
         %
         % Returns the distances travelled along the trail, along with the
         % frame numbers for the following onset and offset.
+        %[intervals, cont] = this.listToIntervals(frames);
+        %all_frames = frames;
+        %for ii = 1:size(intervals(1))
+            %frames = intervals(ii,1):intervals(ii,2);
             if isempty(frames)
                 frames = 1:this.nFrames;
             end
@@ -1240,14 +1307,20 @@ classdef MouseTrackerUnder2 < handle
                 distTraveled = 0;
                 frameNums = [1 1];
             end 
+            %distTraveled_ret(ii) = distTraveled(ii);
+            distTraveled_ret = distTraveled;
+            frameNums_ret = frameNums;
+        %end
+        
         end
         % ------------------------------------------------------------------------------------------------------
-        function showFrame(this, framei, useBinMovie)
+        function showFrame(this, framei, movieType, dispCrop)
             % function showFrame(this, framei, useBinMovie)
             %
             % plots a frame of the movie,
+            if isempty(dispCrop) dispCrop = [1 this.width 1 this.height]; end
             dbg = 0;
-            if useBinMovie
+            if strcmp(movieType, 'bin')
                 bf = zeros(this.height, this.width, 'uint8');
                 for jj=1:size(this.areas,2);
                     on = this.areas(framei,jj).PixelIdxList;
@@ -1269,13 +1342,14 @@ classdef MouseTrackerUnder2 < handle
                 %f = mmread(this.videoFN, this.frameRange(framei));
                 %f = this.readFrames(framei);
                 %imshow(f.frames.cdata); 
-                f = this.readMovieSection(framei,0);
+                f = this.readMovieSection(framei, movieType);
                 imshow(f);
                 %imshow(imabsdiff(f.frames.cdata, this.avgFrame));
                 hold on;
             end
             %annotate the image
             if ~isempty(this.areas)
+                hold on;
                 for jj = 1:size(this.COM,3)
                     plot(this.COM(framei,1,jj), this.COM(framei,2,jj), 'r+', 'MarkerSize', 12, 'LineWidth',1);
                     ellipse(this.areas(framei,jj).MajorAxisLength/2, this.areas(framei,jj).MinorAxisLength/2, ...
@@ -1292,9 +1366,12 @@ classdef MouseTrackerUnder2 < handle
                 if (~isnan(this.noseblob(framei)))
                     line(this.areas(framei,this.noseblob(framei)).Centroid(1), this.areas(framei,this.noseblob(framei)).Centroid(2), ...
                         'Marker', '+', 'Color', 'g','MarkerSize', 12, 'LineWidth',2);
+                    [xv,yv] = pol2cart(this.orient(framei), this.vel(framei));
+                    quiver(this.areas(framei, this.noseblob(framei)).Centroid(1), this.areas(framei,this.noseblob(framei)).Centroid(2), xv, yv, 0);
                 end
                 %plot(this.nosePos(framei,1), this.nosePos(framei,2), '.y', 'MarkerSize', 12);
             end
+           set(gca, 'xlim', [dispCrop(1:2)], 'ylim', [dispCrop(3:4)]);
         end
         
         
@@ -1313,7 +1390,7 @@ classdef MouseTrackerUnder2 < handle
                 res = squeeze(res(:,:,1,:));
             elseif strcmp(flag, 'discontinuous') %due to limitations in videoReader class, have to loop for this
                 totalFrames = sum(diff(frames')'+1);
-                res = zeros(this.height, this.width, totalFrames); %4D matrix
+                res = zeros(this.nativeHeight, this.nativeWidth, totalFrames); %4D matrix
                 res_ind=0;
                 for ii = 1:size(adjFrames,1) %loop that reads
                     ind_n = adjFrames(ii,2)-adjFrames(ii,1)+1;
@@ -1348,17 +1425,16 @@ classdef MouseTrackerUnder2 < handle
         end
         
         % ------------------------------------------------------------------------------------------------------
-        function movieArray = readMovieSection(this, frames, binary)
-        % function movieArray = readMovieSection(this, frames, binary)
+        function movieArray = readMovieSection(this, frames, movieType)
+        % function movieArray = readMovieSection(this, frames, movieType)
         % 
         % reads a section of movie specified by the frames list.
+        % Inputs: frames - a list of frame ranges, formatted like [1 40; 80 100]
+        %         movieType - string either 'orig' for original movie, 'diff' for the difference, or 'bin' for the
+        %         binary
             [frame_ints, flag] = this.listToIntervals(frames);
             rawArray = this.readFrames(frame_ints, flag);
-            if binary
-                movieArray = this.processFrameArray(rawArray, 1:length(frames), this.avgFrame, 1);
-            else
-                movieArray = this.processFrameArray(rawArray, 1:length(frames), this.avgFrame, 0);
-            end
+            movieArray = this.processFrameArray(rawArray, 1:length(frames), this.avgFrame, movieType);
         end
         
         % ------------------------------------------------------------------------------------------------------
@@ -1382,6 +1458,7 @@ classdef MouseTrackerUnder2 < handle
             end
         end
         
+        % ---------------------------------------------------------------------------
         function avg_frame = averageFrame(mov_struct, frame_range) 
             % function to that takes the specific movie structure and computes the average frame of the specified frames
             mov = mov_struct.frames(frame_range);
@@ -1392,7 +1469,8 @@ classdef MouseTrackerUnder2 < handle
             avg_frame = uint8(round(mean(new_mov,3)));
         end
         
-        function [ret_mov, avg_frame] = processFrameArray(rawArray, frame_range, subFrame, binary)
+        % ---------------------------------------------------------------------------
+        function [ret_mov, avg_frame] = processFrameArray(rawArray, frame_range, subFrame, movieType)
             % returns a binary thresholded movie using the frames specified in the input. Also there is
             % an optional argument 'subFrame' specifying a frame to subtract from each frame in order to
             % improve the thresholding of certain objects. rawArray is in the format of dim1,2 - height,width, 3- frame#.
@@ -1405,14 +1483,14 @@ classdef MouseTrackerUnder2 < handle
                 avg_frame = uint8(round(mean(new_mov,3)));
             end
             avg_mov = uint8(repmat(avg_frame, [1 1 size(new_mov,3)]));
-            new_mov = imabsdiff(new_mov, avg_mov); %this should give a nice moving blob.
+            diff_mov = imabsdiff(new_mov, avg_mov); %this should give a nice moving blob.
             %new_mov = new_mov - avg_mov; %this should give a nice moving blob.
             if(boostContrast)
-                new_mov = increaseMovContrast(new_mov);
+                diff_mov = increaseMovContrast(diff_mov);
             end
-            thresh = .1; %.09; %this seems to work after image normalization, .08
-            if binary
-                ret_mov = false(size(new_mov));
+            thresh = .09; %.09; %this seems to work after image normalization, .08
+            if strcmp(movieType, 'bin')
+                ret_mov = false(size(diff_mov));
                 nFrames = size(ret_mov,3);
                 %thresh = graythresh(new_mov)*.9;
                 %thresh = .5*thresh; %changing the thresh a little to include more in the blob (including more tail)
@@ -1420,11 +1498,16 @@ classdef MouseTrackerUnder2 < handle
                     %thresh = graythresh(new_mov(:,:,ii)); % threshold for each frame separately
                     %this is to get rid of the jagged edges due to something regarding movie compression, but also
                     %removes one pixel around the edge of the contiguous sections of blob
-                    bw = im2bw(new_mov(:,:,ii),thresh);
+                    bw = im2bw(diff_mov(:,:,ii),thresh);
                     %bwf = imerode(bw, strel('square',3)); 
                     ret_mov(:,:,ii) = bw;
                 end
-            else
+            elseif strcmp(movieType, 'diff')
+                ret_mov = diff_mov;
+            else % show the original movie
+                if(boostContrast)
+                    new_mov = increaseMovContrast(new_mov);
+                end
                 ret_mov = new_mov;
             end
         end
@@ -1456,6 +1539,20 @@ classdef MouseTrackerUnder2 < handle
                 desc = 'discontinuous';
             else
                 desc = 'continuous';
+            end
+        end
+        
+        % -------------------------------------------------
+        function movieType = parseMovieType(mtype_str)
+            
+            if strcmpi(mtype_str, 'orig')
+                movieType = 0;
+            elseif strcmpi(mtype_str, 'diff')
+                movieType = 1;
+            elseif strcmpi(mtype_str, 'bin')
+                movieType = 2;
+            else
+                movieType = -1;
             end
         end
 
