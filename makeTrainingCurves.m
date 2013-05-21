@@ -1,17 +1,21 @@
 %let's read the file telling us what sections to load
 
 %Analysis Parameters
-following_thresh = 15; %px, the distance from the trail the animal can get before it's counted as not following
+following_thresh = 20; %px, the distance from the trail the animal can get before it's counted as not following
 %vid_list = '3082files.txt';
 %vid_list = '9086files.txt';
-vid_list = '3090files.txt';
+vid_list = '3091files.txt';
 %vid_list = '9085_unbaited_files.txt';
 %vid_list = '3083files.txt';
 %vid_list = 'video_list.txt';
 %hist_trial_range = [1:10; 60:69];
 %hist_trial_range = [1:20; 115:134];
-hist_trial_range = [2:7; 2:7];
-hist_trial_range = [35:49; 20:34];
+%hist_trial_range = [2:7; 2:7];
+%hist_trial_range = [35:53; 16:34];
+%hist_trial_range = [87:100; 101:114];
+%hist_trail_range = [41:67; 68:94];
+hist_trial_range = [62:100; 101:139];
+
 
 %%%%%%%%%%%%%%%% Start in on doing things  %%%%%%%%%%%%%%%%
 fid = fopen(vid_list, 'r');
@@ -143,7 +147,7 @@ for ii = 1:2
         distance_comp{ii,2} = cat(1, distance_comp{ii,2}, ddists);
     end
 end
-    
+%%    
 counts = cell(2,2); %want to do a reward/distractor, early/late comparison
 xbins = 0:5:400;
 [counts{1,1}] = hist(distance_comp{1,1}, xbins); counts{1,2} = hist(distance_comp{1,2},xbins);

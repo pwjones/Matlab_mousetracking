@@ -32,4 +32,5 @@ for ii = 1:length(fnames)
     rew_percent(ii) = mt.propTimeOnTrail(1:mt.nFrames,1,5);
     %distract_dists{ii} = mt.distanceOnTrail([],2,5);
     distract_percent(ii) = mt.propTimeOnTrail(1:mt.nFrames,2,5);
+    mt.plotFollowingSide([], 15, 0);
 end

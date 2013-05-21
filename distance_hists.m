@@ -1,5 +1,6 @@
 distance_comp = cell(2,2); %want to do a reward/distractor, early/late comparison
 trial_range = [1:8; 37:44];
+hist_trial_range = [35:49; 20:34];
 for ii = 1:2
     trials = trial_range(ii,:);
     for jj=1:length(trials)

@@ -1,4 +1,5 @@
-classdef MouseTrackerUnder2 < handle
+classdef MouseTrackerUnderKF < handle
+    % This is the version of the MouseTracker object that uses a kalman filter for nose position 
     properties
         MOUSE_SCALE = 10; % minimal size of the mouse used to exclude smaller objects - radius of mask
         MIN_SIZE_THRESH = 30; %minimal size of a binary area in pixels
@@ -51,7 +52,7 @@ classdef MouseTrackerUnder2 < handle
             % saves the tracking results to minimize memory load. Also, this code is set up to track the position of
             % multiple portions of a binary thresholded image. This is meant to be different parts of the mouse when
             % viewed from below (feet, nose, and tail). Thus, the statistics compiled assume that the whole set of
-            % "blobs" represents a single mouse.
+            % "blobs" represents a single mouse. Version uses a kalman filter for the nose position.
             % 
             % Args: 1 - A filename or folder of the movie to load.  If there isn't one given, then a dialog is
             % presented.
@@ -112,9 +113,6 @@ classdef MouseTrackerUnder2 < handle
                     time_range = varargin{3};
                     t_offset = time_range(1);
                     fr = round((time_range)*this.frameRate + 1);
-                    if (fr(2) > this.readerObj.NumberOfFrames)
-                        fr(2) = this.readerObj.NumberOfFrames;
-                    end
                     this.frameRange = fr(1):fr(2);
                 elseif nargin == 2
                     this.frameRange = varargin{2};
@@ -129,10 +127,6 @@ classdef MouseTrackerUnder2 < handle
                 %vid_struct = mmread(this.videoFN, avgRange);     
                 %vid_struct = this.convertToGray(vid_struct);
                 avgRange = 1:this.avgSubsample:length(this.frameRange);
-                while (length(avgRange) < 20)
-                    this.avgSubsample = floor(this.avgSubsample/2);
-                    avgRange = 1:this.avgSubsample:length(this.frameRange);
-                end
                 vidArray = this.readFrames(this.listToIntervals(avgRange), 'discontinuous');
                 this.avgFrame = uint8(mean(vidArray, 3));
                 %this.avgFrame = mean(vidArray,3);
@@ -1221,18 +1215,11 @@ classdef MouseTrackerUnder2 < handle
             [noseDist, vects, ~] = this.noseDistToTrail(frames, pathNum);
             orthoTheta = mod(cart2pol(vects(:,1), vects(:,2)),2*pi);
             headingTheta = mod(this.headingFromBodyToNose(frames),2*pi);
-            rotations = rotationDirection(headingTheta, orthoTheta);
-            %rotations = mod(headingTheta - orthoTheta, 2*pi);
-            %negi = rotations > pi;
+            rotations = mod(headingTheta - orthoTheta, 2*pi);
+            negi = rotations > pi;
             dists = noseDist;
-            dists = dists .* rotations;
-            %dists(negi) = -1*dists(negi); %switch the sign of some
+            dists(negi) = -1*dists(negi); %switch the sign of some
             
-        end
-        
-        % ------------------------------------------------------------------------------------------------------
-        function dists = meanOrthogonalDistFromTrail(this, frames, pathNum)
-        
         end
         
         % ------------------------------------------------------------------------------------------------------
@@ -1269,40 +1256,7 @@ classdef MouseTrackerUnder2 < handle
             closeFrames = sum(dists < threshDist);
             pTime = closeFrames/numFrames;
         end
-        % ---------------------------------------------------------------------------------------------------
-        function followingFrames = getFollowingSegments(this, frames, trailNum, threshDist)
-        % function followingFrames = getFollowingSegments(this, frames, trailNum, threshDist)
-        %
-        % Returns the frame segments for which the mouse is following the trail
         
-            if isempty(frames)
-                frames = 1:this.nFrames;
-            end
-            %traillNum = 1; % Eventually we need 2+ trails
-            if nargin < 4 %default distance
-                threshDist = 10;
-            end
-            distTraveled = [];
-            frameNums = [];
-            
-            dists = this.noseDistToTrail(frames, trailNum);
-            nn = ~isnan(dists);
-            nnframes = frames(nn);
-            dists = dists(nn);
-            numFrames = length(nnframes);
-            trackingInds = find(dists < threshDist); %close to trail
-            trackJumps = diff(trackingInds); %identify contiguous and non are 
-            skips = find(trackJumps > 1); % noncontiguous
-            if ~isempty(trackingInds)
-                seq_end = trackingInds(skips); %these are the indices of segments of following
-                seq_start = [trackingInds(1) trackingInds(skips(1:end-1)+1)']';
-                frame_start = nnframes(seq_start); %now get the actual frame numbers
-                frame_end = nnframes(seq_end);
-                if (isempty(frame_end)) frame_end = nnframes(trackingInds(end)); end
-                frameNums = [frame_start(:) frame_end(:)];
-            end
-            followingFrames = frameNums;
-        end
         % ---------------------------------------------------------------------------------------------------
         function [distTraveled_ret, frameNums_ret] = distanceOnTrail(this, frames, trailNum, threshDist)
         % function [dists, frames] = distanceOnTrail(this, frames, threshDist) 
@@ -1316,7 +1270,7 @@ classdef MouseTrackerUnder2 < handle
             if isempty(frames)
                 frames = 1:this.nFrames;
             end
-            %traillNum = 1; % Eventually we need 2+ trails
+            traillNum = 1; % Eventually we need 2+ trails
             if nargin < 4 %default distance
                 threshDist = 10;
             end
@@ -1342,8 +1296,6 @@ classdef MouseTrackerUnder2 < handle
                 for ii=1:size(frameNums,1)
                     range = frameNums(ii,1):frameNums(ii,2);
                     pos = this.nosePos(range,:);
-                    pos = reshape(pos(~isnan(pos)),[],2); %this is to deal with the 
-                    % fact that there may be nan position frames in the middle. 
                     point_diffs = diff(pos,1,1);
                     if isempty(point_diffs)
                         distTraveled(ii) = 0;
@@ -1361,16 +1313,6 @@ classdef MouseTrackerUnder2 < handle
             frameNums_ret = frameNums;
         %end
         
-        end
-        % ------------------------------------------------------------------------------------------------------
-        function turning_total = totalTurning(this, frames)
-            measure_name = 'direction';
-            measure = this.(measure_name);
-            turning_vect = diff(measure);
-            framei = frames > 1;
-            frames = frames(framei);
-            turning_vect = turning_vect(frames-1);
-            turning_total = sum(turning_vect);
         end
         % ------------------------------------------------------------------------------------------------------
         function showFrame(this, framei, movieType, dispCrop)
