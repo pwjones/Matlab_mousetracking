@@ -31,8 +31,12 @@ rew_dists = cell(nfiles,1);
 distract_dists = cell(nfiles,1);
 rew_dists_from_trail = cell(nfiles,1);
 distract_dists_from_trail = cell(nfiles,1);
+rew_dists_from_trail_persect = cell(nfiles,1);
+distract_dists_from_trail_persect = cell(nfiles,1);
 total_frames = NaN*zeros(nfiles,1);
 frame_rate = NaN*zeros(nfiles,1);
+total_turning = NaN*zeros(nfiles,1);
+
 
 for ii = 1:nfiles
     fullname = fullfile(base_fname, fnames{ii});
@@ -45,6 +49,9 @@ for ii = 1:nfiles
     distract_dists{ii} = mt.distanceOnTrail([],2,following_thresh);
     rew_dists_from_trail{ii} = mt.orthogonalDistFromTrail(1:mt.nFrames,1);
     distract_dists_from_trail{ii} = mt.orthogonalDistFromTrail(1:mt.nFrames,2);
+    rew_dists_from_trail_persect{ii} = mt.orthogonalDistFromTrailPerSection(1:mt.nFrames,1, following_thresh);
+    distract_dists_from_trail_persect{ii} = mt.orthogonalDistFromTrailPerSection(1:mt.nFrames,2, following_thresh);
+    total_turning(ii) = mt.totalTurning(1:mt.nFrames);
     % now collect a few factors about each of the movies
     total_frames(ii) = mt.nFrames;
     frame_rate(ii) = mt.frameRate;
@@ -59,3 +66,6 @@ ret.total_frames = total_frames;
 ret.frame_rate = frame_rate;
 ret.rew_dists_from_trail = rew_dists_from_trail;
 ret.distract_dists_from_trail = distract_dists_from_trail;
+ret.total_turning = total_turning;
+ret.rew_dists_from_trail_persect = rew_dists_from_trail_persect;
+ret.distract_dists_from_trail_persect = distract_dists_from_trail_persect;

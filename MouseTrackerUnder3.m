@@ -1,7 +1,7 @@
-classdef MouseTrackerUnder2 < handle
+classdef MouseTrackerUnder3 < handle
     properties
         MOUSE_SCALE = 10; % minimal size of the mouse used to exclude smaller objects - radius of mask
-        MIN_SIZE_THRESH = 30; %minimal size of a binary area in pixels
+        MIN_SIZE_THRESH = 20; %minimal size of a binary area in pixels
         MAX_SIZE_THRESH = 1200;
         videoFN = []; % filename of the video
         readerObj; %videoReader object 
@@ -45,7 +45,7 @@ classdef MouseTrackerUnder2 < handle
     end
     
     methods
-        function this = MouseTrackerUnder2(varargin)
+        function this = MouseTrackerUnder3(varargin)
             % MouseTrackerUnder(varargin) - This is an object that loads a video and then detects a mouse in that video
             % letting you get the mouse position in various parts of the video.  It does this on an request basis, then 
             % saves the tracking results to minimize memory load. Also, this code is set up to track the position of
@@ -887,7 +887,7 @@ classdef MouseTrackerUnder2 < handle
             nosep = NaN* zeros(length(frames), 2);
             for ii = 1:length(frames)
                 fi = frames(ii);
-                if (this.nblobs(fi) > 1) %only works if there are things to track
+                if (this.nblobs(fi) > 3) %only works if there are enough things to track
                     if this.tailVisible(fi) && (this.nblobs(fi) > 2)%we can only do this first method if the tail is present
                         % compute the vector from tail to body center
                         bodyVect = this.bodyCOM(fi,:) - this.areas(fi,this.tailblob(fi)).Centroid;
@@ -905,7 +905,7 @@ classdef MouseTrackerUnder2 < handle
             % putting in a maximum distance criterion of 500 px away from last frame 
             dists = diff(nosep,1,1);
             dists = sqrt(sum(dists.^2,2));
-            toofar = dists > 500;
+            toofar = dists > 100;
             nosep(toofar,:) = NaN*zeros(sum(toofar), 2);
         end
         
@@ -919,7 +919,7 @@ classdef MouseTrackerUnder2 < handle
             limit = round(this.frameRate * 3); %X sec; number of frames necessary to be eliminated as static
             dist_thresh = 1; %What do we call the same position, along each axis 
             area_thresh = 15; %the amount that an area can change frame to frame to be counted as the same
-            abs_area_thresh = 50; %the upper bound for the size for deleted objects
+            abs_area_thresh = 30; %the upper bound for the size for deleted objects
             max_block_size = 2^11; %the maximum number of frames processed at once - need to break up for long segments
                                    %for memory reasons
             nblocks = ceil(this.nFrames/max_block_size);
@@ -1599,19 +1599,24 @@ classdef MouseTrackerUnder2 < handle
             if(boostContrast)
                 diff_mov = increaseMovContrast(diff_mov);
             end
-            thresh = .09; %.09; %this seems to work after image normalization, .08
+            %thresh = .09; %.09; %this seems to work after image normalization, .08
+            thresh(2) = 1 * graythresh(diff_mov);
+            thresh(1) =  .4 * thresh(2);
+            thresh(1) = .12;
             if strcmp(movieType, 'bin')
                 ret_mov = false(size(diff_mov));
                 nFrames = size(ret_mov,3);
                 %thresh = graythresh(new_mov)*.9;
                 %thresh = .5*thresh; %changing the thresh a little to include more in the blob (including more tail)
-                for ii = 1:nFrames
-                    %thresh = graythresh(new_mov(:,:,ii)); % threshold for each frame separately
-                    %this is to get rid of the jagged edges due to something regarding movie compression, but also
-                    %removes one pixel around the edge of the contiguous sections of blob
-                    bw = im2bw(diff_mov(:,:,ii),thresh);
-                    %bwf = imerode(bw, strel('square',3)); 
-                    ret_mov(:,:,ii) = bw;
+                for jj = 1
+                    for ii = 1:nFrames
+                        %thresh = graythresh(new_mov(:,:,ii)); % threshold for each frame separately
+                        %this is to get rid of the jagged edges due to something regarding movie compression, but also
+                        %removes one pixel around the edge of the contiguous sections of blob
+                        bw = im2bw(diff_mov(:,:,ii),thresh(jj));
+                        bw = imerode(bw, strel('square',3)); 
+                        ret_mov(:,:,ii) = bw;
+                    end
                 end
             elseif strcmp(movieType, 'diff')
                 ret_mov = diff_mov;

@@ -3,6 +3,7 @@ function plotDistanceHistComparison(rew_cell, dist_cell, rew_cell2, dist_cell2, 
 %
 % Function will plot histograms of the frame by frame distance from the
 % path for 
+min_dist = 0; %.75;
 
 nfiles = [length(rew_cell), length(dist_cell); length(rew_cell2), length(dist_cell2)];
 rew = {rew_cell, rew_cell2};
@@ -15,7 +16,7 @@ for ii = 1:2
         %compile distances from the trail for two conditions
         r_trials = rew{ii};
         rdists = r_trials{jj};
-        inci = (abs(rdists) <= dist_thresh) & ~isnan(rdists) & (abs(rdists) >= .75);
+        inci = (abs(rdists) <= dist_thresh) & ~isnan(rdists) & (abs(rdists) >= min_dist);
         rdists = rdists(inci);
         distance_comp{ii,1} = cat(1, distance_comp{ii,1}, rdists);
     end
@@ -24,7 +25,7 @@ for ii = 1:2
     for jj=1:trials
         d_trials = dist{ii};
         ddists = d_trials{jj};
-        inci = (abs(ddists) <= dist_thresh) & ~isnan(ddists) & (abs(ddists) >= .75);
+        inci = (abs(ddists) <= dist_thresh) & ~isnan(ddists) & (abs(ddists) >= min_dist);
         ddists = ddists(inci);
         distance_comp{ii,2} = cat(1, distance_comp{ii,2}, ddists);
     end
@@ -53,6 +54,11 @@ xmed = double(median(distance_comp{2,1}));
 line([xmed xmed], [0 -yl(2)], 'Color', dg, 'LineStyle', '--'); 
 text(xmed, -yl(2)-10, ['median: ' num2str(xmed)], 'color', dg);
 
+% KS test the distributions
+[h,p,ks2stat] = kstest2(counts{1,1}, counts{2,1});
+if h sig = ''; else sig = 'NOT'; end
+sprintf('Rewarded conditions are %s significantly different: h=%i p=%f', sig, h, p);
+
 % Non rewarded path
 yl = max([counts{1,2} counts{2,2}]);  yl = [-(yl+5) yl+5];
 subplot(2,1,2); hold on;
@@ -77,3 +83,18 @@ set(gca, 'TickDir', 'out');
 % Plot the CDFs
 plotEmpiricalCDF(distance_comp, .2, {[0 1 0],[0 1 0], [1 0 0], [1 0 0]}, {'-','--', '-','--'});
 
+% Also let's plot the n versus n+1 values against each other to see if they
+% are correlated.
+figure;
+subplot(2,2,1);
+xd = counts{1,1};
+plot(xd(1:end-1), xd(2:end), 'k.'); hold on;
+subplot(2,2,2);
+xd = counts{2,1};
+plot(xd(1:end-1), xd(2:end), 'k.'); hold on;
+subplot(2,2,3);
+xd = counts{1,2};
+plot(xd(1:end-1), xd(2:end), 'k.'); hold on;
+subplot(2,2,4);
+xd = counts{2,2};
+plot(xd(1:end-1), xd(2:end), 'k.'); hold on;

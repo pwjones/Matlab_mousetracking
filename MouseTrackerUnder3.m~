@@ -1,4 +1,4 @@
-classdef MouseTrackerUnder2 < handle
+classdef MouseTrackerUnder3 < handle
     properties
         MOUSE_SCALE = 10; % minimal size of the mouse used to exclude smaller objects - radius of mask
         MIN_SIZE_THRESH = 30; %minimal size of a binary area in pixels
@@ -45,7 +45,7 @@ classdef MouseTrackerUnder2 < handle
     end
     
     methods
-        function this = MouseTrackerUnder2(varargin)
+        function this = MouseTrackerUnder3(varargin)
             % MouseTrackerUnder(varargin) - This is an object that loads a video and then detects a mouse in that video
             % letting you get the mouse position in various parts of the video.  It does this on an request basis, then 
             % saves the tracking results to minimize memory load. Also, this code is set up to track the position of
@@ -1600,6 +1600,8 @@ classdef MouseTrackerUnder2 < handle
                 diff_mov = increaseMovContrast(diff_mov);
             end
             thresh = .09; %.09; %this seems to work after image normalization, .08
+            thresh = graythresh(diff_mov);
+            
             if strcmp(movieType, 'bin')
                 ret_mov = false(size(diff_mov));
                 nFrames = size(ret_mov,3);

@@ -113,6 +113,9 @@ classdef MouseTrackerUnderKF < handle
                     time_range = varargin{3};
                     t_offset = time_range(1);
                     fr = round((time_range)*this.frameRate + 1);
+                    if (fr(2) > this.readerObj.NumberOfFrames)
+                        fr(2) = this.readerObj.NumberOfFrames;
+                    end
                     this.frameRange = fr(1):fr(2);
                 elseif nargin == 2
                     this.frameRange = varargin{2};
@@ -127,6 +130,10 @@ classdef MouseTrackerUnderKF < handle
                 %vid_struct = mmread(this.videoFN, avgRange);     
                 %vid_struct = this.convertToGray(vid_struct);
                 avgRange = 1:this.avgSubsample:length(this.frameRange);
+                while (length(avgRange) < 20)
+                    this.avgSubsample = floor(this.avgSubsample/2);
+                    avgRange = 1:this.avgSubsample:length(this.frameRange);
+                end
                 vidArray = this.readFrames(this.listToIntervals(avgRange), 'discontinuous');
                 this.avgFrame = uint8(mean(vidArray, 3));
                 %this.avgFrame = mean(vidArray,3);
@@ -1215,11 +1222,35 @@ classdef MouseTrackerUnderKF < handle
             [noseDist, vects, ~] = this.noseDistToTrail(frames, pathNum);
             orthoTheta = mod(cart2pol(vects(:,1), vects(:,2)),2*pi);
             headingTheta = mod(this.headingFromBodyToNose(frames),2*pi);
-            rotations = mod(headingTheta - orthoTheta, 2*pi);
-            negi = rotations > pi;
+            rotations = rotationDirection(headingTheta, orthoTheta);
+            %rotations = mod(headingTheta - orthoTheta, 2*pi);
+            %negi = rotations > pi;
             dists = noseDist;
-            dists(negi) = -1*dists(negi); %switch the sign of some
+            dists = dists .* rotations; %gives it a sign
+            %dists(negi) = -1*dists(negi); %switch the sign of some
             
+        end
+        
+        % ------------------------------------------------------------------------------------------------------
+        function meanDist = meanOrthogonalDistFromTrail(this, frames, pathNum)
+        % function dists = meanOrthogonalDistFromTrail(this, frames, pathNum, threshDist)
+        %
+        %
+            dists = this.orthogonalDistFromTrail(frames, pathNum);
+            meanDist = nanmean(dists);
+        
+        end
+        
+        % ------------------------------------------------------------------------------------------------------
+        function dists = orthogonalDistFromTrailPerSection(this, frames, pathNum, threshDist)
+        % function dists = meanOrthogonalDistFromTrail(this, frames, pathNum, threshDist)
+        %
+        %
+            followingFrames = this.getFollowingSegments(frames, pathNum, threshDist);
+            dists = zeros(size(followingFrames,1), 1);
+            for ii = 1:size(followingFrames, 1)
+                dists(ii) = this.meanOrthogonalDistFromTrail(followingFrames(ii,1):followingFrames(ii,2), pathNum);
+            end
         end
         
         % ------------------------------------------------------------------------------------------------------
@@ -1256,7 +1287,6 @@ classdef MouseTrackerUnderKF < handle
             closeFrames = sum(dists < threshDist);
             pTime = closeFrames/numFrames;
         end
-        
         % ---------------------------------------------------------------------------------------------------
         function [distTraveled_ret, frameNums_ret] = distanceOnTrail(this, frames, trailNum, threshDist)
         % function [dists, frames] = distanceOnTrail(this, frames, threshDist) 
@@ -1313,6 +1343,15 @@ classdef MouseTrackerUnderKF < handle
             frameNums_ret = frameNums;
         %end
         
+        % ------------------------------------------------------------------------------------------------------
+        function turning_total = totalTurning(this, frames)
+            measure_name = 'direction';
+            measure = this.(measure_name);
+            turning_vect = diff(measure);
+            framei = frames > 1;
+            frames = frames(framei);
+            turning_vect = turning_vect(frames-1);
+            turning_total = nansum(turning_vect);
         end
         % ------------------------------------------------------------------------------------------------------
         function showFrame(this, framei, movieType, dispCrop)
