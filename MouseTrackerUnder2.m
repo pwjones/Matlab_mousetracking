@@ -1002,6 +1002,12 @@ classdef MouseTrackerUnder2 < handle
             end
             
         end
+         % ------------------------------------------------------------------------------------------------------ 
+        function detectRefinePaths(this,time,absoluteTime,useAvgFrame)
+            this.detectPaths(time, absoluteTime, useAvgFrame);
+            this.refinePaths(1);
+            this.refinePaths(2);
+        end
         % ------------------------------------------------------------------------------------------------------
         function [e, eimage] = detectEdgesInFrame(this, time, absoluteTime, useAvgFrame)
             % function e = detectEdgesInFrame(this, time, absoluteTime)
@@ -1541,7 +1547,7 @@ classdef MouseTrackerUnder2 < handle
             %thresh = .09; %.09; %this seems to work after image normalization, .08
             thresh(2) = 1 * graythresh(diff_mov);
             thresh(1) =  .4 * thresh(2);
-            thresh(1) = .07;
+            thresh(1) = .09;
             if ~isempty(varargin) && ~isempty(varargin{1}) % I'm not exactly sure MATLAB is making empty cells
                 thresh(1) = varargin{1}; 
             end
