@@ -206,7 +206,7 @@ classdef MouseTrackerUnder2 < handle
         
         % ------------------------------------------------------------------------------------------------------
         function ah = plotVelocity(this, frames)
-            % function plotVelocity(this)
+            % function plotVelocity(this) 
             if ~exist('frames', 'var') || isempty(frames); frames = 1:this.nFrames; end
             figure;
             sorted_vel = sort(this.vel); %sorted vector of speeds for colormapping
@@ -218,28 +218,31 @@ classdef MouseTrackerUnder2 < handle
             imshow(this.plotPathsOnBg()); hold on;
             xlim([0 this.width]); %fit the axes to the image
             ylim([0 this.height]);
-            cm = colormap(spring(this.nFrames));
+            %cm = colormap(spring(this.nFrames));
+            vel_vect = this.vel(frames);
+            [cm cinds] = getIndexedColors('jet', vel_vect, 1);
+            cm = brighten(cm, .5);
             % unfortunately, I haven't been able to figure out an easier way to do colormapping of points plotted over
             % a B&W image, without the points and the image sharing the same colormap.  So, here I'm just plotting every
             % point separately, with a color indicative of the velocity of the animal.
-            for ii=1:1:length(frames)
+            for ii=1:length(frames)
                 fi = frames(ii);
-                ci = find(sorted_vel == this.vel(fi), 1, 'first');
-                if ~isnan(ci)
-                    line('Xdata', this.nosePos(ii,1,1), 'Ydata', this.nosePos(ii,2,1), 'Marker', '.', 'MarkerSize', 10, 'Color', cm(ci,:));
+                %ci = find(sorted_vel == this.vel(fi), 1, 'first');
+                if ~isnan(vel_vect(ii))
+                    line('Xdata', this.nosePos(fi,1), 'Ydata', this.nosePos(fi,2), 'Marker', '.', 'MarkerSize', 10, 'Color', cm(cinds(ii),:));
                 end
             end 
             ah = gca;
             %Make another figure entirely to get a color scale
             fh2 = figure;
-            ah2 = axes('position', [.1 .1 .7 .8], 'visible', 'off');
-            cm = colormap(spring(this.nFrames));
-            axes(ah2);
+            %ah2 = axes('position', [.1 .1 .7 .8], 'visible', 'off');
+            colormap(cm);
+            %axes(ah2);
             pcolor([this.vel(frames,1), this.vel(frames,1)]);
             %line('parent', ah2, 'ydata', sorted_dir, 'xdata', 1:length(sorted_dir)); 
             colorbar;
         end
-        
+        % ------------------------------------------------------------------------------------------------------
         function plotVelocityTimes(this, time_range)
          % Version using a range of times, rather than frames
             frames = this.timesToFrames(time_range);
@@ -309,8 +312,40 @@ classdef MouseTrackerUnder2 < handle
             end 
             title(this.videoFN);
         end
-        
-        % ------------------------------------------------------------------------------------------------------
+        % ------------------------------------------------------------------------------------------    
+        function [nb_stat, nose_bright] = getNoseBrightness(this, frames, operation)
+            % operation is a function pointer to operation to be performed
+            % on the set of nose pixels 
+            nSegs = ceil(length(frames)/this.framesPerSeg);
+            movieDone = 0; 
+            dbg = 0;
+            nose_bright = NaN*zeros(length(frames), this.MAX_SIZE_THRESH);
+            nb_stat = NaN*zeros(length(frames),1);
+            for jj = 1:nSegs %divide the computation up into segments so that there is never too much in memory at once
+                first = (jj-1)*this.framesPerSeg + 1; %first frame of segment
+                if (jj == nSegs) % the last frame
+                    last = length(frames);
+                else
+                    last = (jj)*this.framesPerSeg;
+                end
+                disp(sprintf('Finding brightnesses for frames %d - %d', first, last));
+                segFrames = frames(first:last);
+                
+                frameArray = this.readMovieSection(segFrames,'diff');
+                for ii = 1:(last-first)
+                    fi = frames(first+ii-1);
+                    if ~isnan(this.noseblob(fi))
+                        ni = this.areas(fi, this.noseblob(fi)).PixelIdxList;
+                        frame = frameArray(:,:,ii);
+                        nose_px = frame(ni);
+                        nose_bright(first+ii-1, 1:length(nose_px)) = nose_px; 
+                        nb_stat(first+ii-1) = operation(nose_px(:));
+                    end
+                end
+                        
+            end
+        end
+        % -------------------------------------------------------------------------------------------
         function plotDirection(this, frames)
             % function plotDirection(this, frames)
             plotblue = [.3, .6, 1]; % a nice blue color
@@ -319,13 +354,8 @@ classdef MouseTrackerUnder2 < handle
             ah = axes('position', [.1, .1, .7 .8]);
             cm = colormap(hsv(this.nFrames));
             sorted_dir = sort(this.direction); %sorted vector for colormapping
-            %pathIm = this.plotPaths()*255;
-            %redIm = min(this.avgFrame + pathIm, 255);
-            %blueIm = max(this.avgFrame - pathIm, 0);
-            %bgIm = cat(3, blueIm, blueIm, redIm);
             bgIm = this.plotPathsOnBg();
             imshow(bgIm); hold on;
-            %imshow(this.avgFrame); hold on;
             xlim([0 this.width]);
             ylim([0 this.height]);
             % unfortunately, I haven't been able to figure out an easier way to do colormapping of points plotted over
@@ -1173,10 +1203,20 @@ classdef MouseTrackerUnder2 < handle
                 [noseDist, mini] = nanmin(distm, [], 2);
                 closestTrailP = trailPos(mini, :);
                 vects = closestTrailP - nosePos;
-            else
-                noseDist = NaN*zeros(length(frames), 1);
-                vects = NaN*zeros(length(frames), 2);
-                disp('There must be a detected path to calculate distances');
+            else % if there are no paths return zeros, but if there are return a mock path result
+                if isempty(this.paths)
+                    noseDist = NaN*zeros(length(frames), 1);
+                    vects = NaN*zeros(length(frames), 2);
+                    disp('There must be a detected path to calculate distances');
+                else %make a fake trail
+                    nosePos = this.nosePos(frames,:);
+                    fakeTrail = this.makeMirrorPath(this.paths(1));
+                    trailPos = fakeTrail.PixelList;
+                    distm = ipdm(single(nosePos), single(trailPos));
+                    [noseDist, mini] = nanmin(distm, [], 2);
+                    closestTrailP = trailPos(mini, :);
+                    vects = closestTrailP - nosePos;
+                end
             end
             if ~isempty(varargin)
                 thresh_dist = varargin{1}; %varargin 1 is the threshold distance to only return those distances under that
@@ -1497,6 +1537,14 @@ classdef MouseTrackerUnder2 < handle
             disp(['Opening new video reader object for: ' vidFN]);
             this.readerObj = VideoReader(vidFN);
         end
+        
+        % ---------------------------------------------------
+        function fakePath = makeMirrorPath(this,path)  
+            fakePath.Area = path.Area;
+            PixelList = [this.width - path.PixelList(:,1)+1, this.height - path.PixelList(:,2)+1];
+            fakePath.PixelIdxList= this.height*(PixelList(:,1)-1) + PixelList(:,2);
+            fakePath.PixelList = PixelList;
+        end
 
     end %Methods
     
@@ -1532,6 +1580,10 @@ classdef MouseTrackerUnder2 < handle
             % it out gives the default
             boostContrast = 1; %flag for boosting the contrast
             new_mov = rawArray(:,:,frame_range);
+            %detection settings
+            thresh(1) = .1; % the threshold level
+            erode_size = 5; %the size 
+            
             % make a movie from the average frame to subtract
             if ~isempty(subFrame)
                 avg_frame = subFrame;
@@ -1547,7 +1599,7 @@ classdef MouseTrackerUnder2 < handle
             %thresh = .09; %.09; %this seems to work after image normalization, .08
             thresh(2) = 1 * graythresh(diff_mov);
             thresh(1) =  .4 * thresh(2);
-            thresh(1) = .09;
+            %thresh(1) = .08; .11;
             if ~isempty(varargin) && ~isempty(varargin{1}) % I'm not exactly sure MATLAB is making empty cells
                 thresh(1) = varargin{1}; 
             end
@@ -1562,7 +1614,7 @@ classdef MouseTrackerUnder2 < handle
                         %this is to get rid of the jagged edges due to something regarding movie compression, but also
                         %removes one pixel around the edge of the contiguous sections of blob
                         bw = im2bw(diff_mov(:,:,ii),thresh(jj));
-                        bw = imerode(bw, strel('square',3)); 
+                        bw = imerode(bw, strel('square',erode_size)); 
                         ret_mov(:,:,ii) = bw;
                     end
                 end
@@ -1620,6 +1672,8 @@ classdef MouseTrackerUnder2 < handle
             end
         end
         
+        
+                
         
     end % methods - private
 end %classdef

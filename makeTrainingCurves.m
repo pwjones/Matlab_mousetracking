@@ -3,8 +3,8 @@
 %Analysis Parameters
 following_thresh = 20; %px, the distance from the trail the animal can get before it's counted as not following
 %vid_list = '3082files.txt';
-%vid_list = '9086files.txt';
-vid_list = '3091files.txt';
+vid_list = '9085files.txt';
+%vid_list = '3091files.txt';
 %vid_list = '9085_unbaited_files.txt';
 %vid_list = '3083files.txt';
 %vid_list = 'video_list.txt';
@@ -55,6 +55,7 @@ for ii = 1:nfiles
 %    mt.plotFollowing([], following_thresh, 0);
     rew_prop(ii) = mt.propTimeOnTrail([],1,following_thresh);
     dist_prop(ii) = mt.propTimeOnTrail([],2,following_thresh);
+    fake_prop(ii) = mt.propTimeOnTrail([],3,following_thresh);
     rew_dists{ii} = mt.distanceOnTrail([],1,following_thresh);
     distract_dists{ii} = mt.distanceOnTrail([],2,following_thresh);
     % now collect a few factors about each of the movies
@@ -64,20 +65,23 @@ end
 
 %% Section for plotting curves
 figure;
-plot(rew_prop, 'g');
-hold on;
-plot(dist_prop, 'r');
-xlabel('Trial #','FontSize', 14);
+plot(1:length(fake_prop), fake_prop *100,'Color', [.25 .25 .25]); hold on;
+plot(rew_prop*100, 'g');
+plot(dist_prop*100, 'r');
 boxcar = [1 1 1 1 1]./ 5;
 samps_cut = floor(length(boxcar)/2);
+fake_prop_filt = conv(fake_prop, boxcar,'valid');
 rew_prop_filt = conv(rew_prop, boxcar,'valid');
 dist_prop_filt = conv(dist_prop, boxcar,'valid');
 vi = (1+samps_cut):(samps_cut+length(rew_prop_filt));
-plot(vi, rew_prop_filt, 'g', 'LineWidth',2);
-plot(vi, dist_prop_filt, 'r', 'LineWidth',2);
+flh = plot(vi, fake_prop_filt*100,'LineWidth',2, 'Color', [.25 .25 .25]);
+plot(vi, rew_prop_filt*100, 'g', 'LineWidth',2);
+plot(vi, dist_prop_filt*100, 'r', 'LineWidth',2);
+set(gca, 'TickDir','out', 'fontsize', 16);
+xlabel('Trial #','FontSize', 18);
+ylabel('% Time on Trail','FontSize', 18);
 
-
-legend({'Rewarded Trail', 'Distracter Trail'});
+legend({'Sham Trail','Rewarded Trail', 'Distracter Trail'});
 title('Proportion of Time Following Trails');
 
 figure; 

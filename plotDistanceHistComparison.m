@@ -1,9 +1,15 @@
-function plotDistanceHistComparison(rew_cell, dist_cell, rew_cell2, dist_cell2, dist_thresh)
+function plotDistanceHistComparison(rew_cell, dist_cell, rew_cell2, dist_cell2, dist_thresh, plotOptions, varargin)
 % function plotDistanceHists(dist_cell)
 %
 % Function will plot histograms of the frame by frame distance from the
 % path for 
-min_dist = 0; %.75;
+min_dist = .5; %.75;
+
+if ~isempty(varargin)
+    cdf_ah = varargin{1};
+else
+    figure; cdf_ah = axes; hold on;
+end
 
 nfiles = [length(rew_cell), length(dist_cell); length(rew_cell2), length(dist_cell2)];
 rew = {rew_cell, rew_cell2};
@@ -57,7 +63,8 @@ text(xmed, -yl(2)-10, ['median: ' num2str(xmed)], 'color', dg);
 % KS test the distributions
 [h,p,ks2stat] = kstest2(counts{1,1}, counts{2,1});
 if h sig = ''; else sig = 'NOT'; end
-sprintf('Rewarded conditions are %s significantly different: h=%i p=%f', sig, h, p);
+sig_str = sprintf('Rewarded conditions are %s significantly different: h=%i p=%f', sig, h, p);
+disp(sig_str);
 
 % Non rewarded path
 yl = max([counts{1,2} counts{2,2}]);  yl = [-(yl+5) yl+5];
@@ -81,7 +88,11 @@ ylabel('# Instances','FontSize', 14);
 set(gca, 'TickDir', 'out');
 
 % Plot the CDFs
-plotEmpiricalCDF(distance_comp, .2, {[0 1 0],[0 1 0], [1 0 0], [1 0 0]}, {'-','--', '-','--'});
+plotEmpiricalCDF(distance_comp, .2, {[0 1 0],[0 1 0], [1 0 0], [1 0 0]}, plotOptions, cdf_ah);
+set(get(cdf_ah,'XLabel'), 'String', 'Nose distance From Trail (px)', 'FontSize', 18);
+set(get(cdf_ah,'Ylabel'), 'String', 'Cumulative Proporation of Frames', 'FontSize', 18);
+set(cdf_ah, 'Tickdir', 'out', 'FontSize', 14);
+axes(cdf_ah); ylim([0 1]);
 
 % Also let's plot the n versus n+1 values against each other to see if they
 % are correlated.
