@@ -1,8 +1,7 @@
 classdef MouseTrackerKF < handle
-    % This is the version of the MouseTracker object that uses a kalman filter for nose position 
     properties
         MOUSE_SCALE = 10; % minimal size of the mouse used to exclude smaller objects - radius of mask
-        MIN_SIZE_THRESH = 30; %minimal size of a binary area in pixels
+        MIN_SIZE_THRESH = 20; %minimal size of a binary area in pixels
         MAX_SIZE_THRESH = 1200;
         videoFN = []; % filename of the video
         readerObj; %videoReader object 
@@ -37,6 +36,8 @@ classdef MouseTrackerKF < handle
         tailVisible % boolean
         paths %binary areas for the detected paths
         boostContrast = 1; %video processing option, boolean switch to boost contrast of the movie on each frame
+        default_thresh = 0;
+        body_thresh = .1;
         % The list of properties detected in the binary image of each frame
         regprops = {'Area', 'Centroid', 'BoundingBox','MajorAxisLength','MinorAxisLength','Orientation','Extrema','PixelIdxList','PixelList','Perimeter'};
         blobsToDelete = []; %list for debugging purposes of those blobs to delete - to mark them.
@@ -46,13 +47,13 @@ classdef MouseTrackerKF < handle
     end
     
     methods
-        function this = MouseTrackerUnder2(varargin)
-            % MouseTrackerUnder(varargin) - This is an object that loads a video and then detects a mouse in that video
+        function this = MouseTrackerKF(varargin)
+            % MouseTrackerKF(varargin) - This is an object that loads a video and then detects a mouse in that video
             % letting you get the mouse position in various parts of the video.  It does this on an request basis, then 
             % saves the tracking results to minimize memory load. Also, this code is set up to track the position of
             % multiple portions of a binary thresholded image. This is meant to be different parts of the mouse when
             % viewed from below (feet, nose, and tail). Thus, the statistics compiled assume that the whole set of
-            % "blobs" represents a single mouse. Version uses a kalman filter for the nose position.
+            % "blobs" represents a single mouse.
             % 
             % Args: 1 - A filename or folder of the movie to load.  If there isn't one given, then a dialog is
             % presented.
@@ -86,7 +87,20 @@ classdef MouseTrackerKF < handle
             if exist(mat_fn, 'file')
                 % then load the saved file
                 disp(['Loading the saved object for: ' mat_fn]);
-                load(mat_fn);
+                arg_vidFN = this.videoFN;
+                try
+                    load(mat_fn)
+                catch ME
+                    disp(['Error loading: ' mat_fn]);
+                end
+                if exist(this.videoFN, 'file')
+                    this.findMovieFile(this.videoFN);
+                elseif (exist(arg_vidFN)) %if files are moved, resolve
+                    this.findMovieFile(arg_vidFN);
+                else
+                    error('There is no valid movie file specified. Cannot load object');
+                end
+                this.videoFN = arg_vidFN; %for some reason, in no case does the full video filename gets saved
             else %initialize normally 
                 % Read just a couple of frames to get an idea of video speeds, etc.
                 this.readerObj = VideoReader(this.videoFN);
@@ -193,8 +207,8 @@ classdef MouseTrackerKF < handle
         end
         
         % ------------------------------------------------------------------------------------------------------
-        function plotVelocity(this, frames)
-            % function plotVelocity(this)
+        function ah = plotVelocity(this, frames)
+            % function plotVelocity(this) 
             if ~exist('frames', 'var') || isempty(frames); frames = 1:this.nFrames; end
             figure;
             sorted_vel = sort(this.vel); %sorted vector of speeds for colormapping
@@ -206,28 +220,31 @@ classdef MouseTrackerKF < handle
             imshow(this.plotPathsOnBg()); hold on;
             xlim([0 this.width]); %fit the axes to the image
             ylim([0 this.height]);
-            cm = colormap(jet(this.nFrames));
+            %cm = colormap(spring(this.nFrames));
+            vel_vect = this.vel(frames);
+            [cm cinds] = getIndexedColors('jet', vel_vect, 1);
+            cm = brighten(cm, .5);
             % unfortunately, I haven't been able to figure out an easier way to do colormapping of points plotted over
             % a B&W image, without the points and the image sharing the same colormap.  So, here I'm just plotting every
             % point separately, with a color indicative of the velocity of the animal.
-            for ii=1:1:length(frames)
+            for ii=1:length(frames)
                 fi = frames(ii);
-                ci = find(sorted_vel == this.vel(fi), 1, 'first');
-                if ~isnan(ci)
-                    line('Xdata', this.nosePos(ii,1,1), 'Ydata', this.nosePos(ii,2,1), 'Marker', '.', 'MarkerSize', 6, 'Color', cm(ci,:));
-                    %line('Xdata', this.bodyCOM(fi,1,1), 'Ydata', this.bodyCOM(fi,2,1), 'Marker', '.', 'MarkerSize', 6, 'Color', cm(ci,:));
+                %ci = find(sorted_vel == this.vel(fi), 1, 'first');
+                if ~isnan(vel_vect(ii))
+                    line('Xdata', this.nosePos(fi,1), 'Ydata', this.nosePos(fi,2), 'Marker', '.', 'MarkerSize', 10, 'Color', cm(cinds(ii),:));
                 end
             end 
+            ah = gca;
             %Make another figure entirely to get a color scale
             fh2 = figure;
-            ah2 = axes('position', [.1 .1 .7 .8], 'visible', 'off');
-            cm = colormap(jet(this.nFrames));
-            axes(ah2);
+            %ah2 = axes('position', [.1 .1 .7 .8], 'visible', 'off');
+            colormap(cm);
+            %axes(ah2);
             pcolor([this.vel(frames,1), this.vel(frames,1)]);
             %line('parent', ah2, 'ydata', sorted_dir, 'xdata', 1:length(sorted_dir)); 
             colorbar;
         end
-        
+        % ------------------------------------------------------------------------------------------------------
         function plotVelocityTimes(this, time_range)
          % Version using a range of times, rather than frames
             frames = this.timesToFrames(time_range);
@@ -235,29 +252,44 @@ classdef MouseTrackerKF < handle
         end
         
         % ------------------------------------------------------------------------------------------------------
-        function plotPosition(this, frames)
+        function plotPosition(this, frames, varargin)
             % function plotPosition(this, frames)
             %
             % This plots the detected mouse positions in red over the background frame
-        
-            if ~exist('frames', 'var') || isempty(frames); frames = 1:this.nFrames; end
-            fh = figure;
-            ah = axes('position', [.1, .1, .7 .8]);
-            cm = colormap(hsv(this.nFrames));
-            sorted_dir = sort(this.direction); %sorted vector for colormapping
-            pathIm = this.plotPaths()*255;
-            redIm = min(this.avgFrame + pathIm, 255);
-            blueIm = max(this.avgFrame - pathIm, 0);
-            bgIm = cat(3, blueIm, blueIm, redIm);
-            imshow(bgIm); hold on;
+            c = [.3, .6, 1]; %plotblue
+            marker = '.';
+            ah = [];
+            overwrite = 1;
+            if length(varargin) >=1
+                ah = varargin{1};
+                newFig = 0;
+            end
+            if length(varargin) >= 2
+                overwrite = varargin{2};
+            end
+            if length(varargin) >=3
+                c = varargin{3};
+            end
+            if length(varargin) >=4
+                marker = varargin{4};
+            end
+            if isempty(frames); frames = 1:this.nFrames; end
+            if isempty(ah)
+                fh = figure; 
+                ah = axes('position', [.1, .1, .7 .8]); hold on;
+                newFig = 1;
+            end
+            if (newFig || overwrite) 
+                pathIm = this.plotPathsOnBg();
+                imshow(pathIm); hold on;
+            end
             xlim([0 this.width]);
             ylim([0 this.height]);
             for ii=1:length(frames)
                 fi = frames(ii);
-                ci = find(sorted_dir == this.direction(fi), 1, 'first');
                 if ~isnan(this.noseblob(fi))
-                    line('Xdata', this.areas(fi,this.noseblob(fi)).Centroid(1), 'Ydata', ...
-                        this.areas(fi,this.noseblob(fi)).Centroid(2), 'Marker', '.', 'MarkerSize', 10, 'Color', 'r');
+                    line('Parent', ah, 'Xdata', this.nosePos(fi,1,1), 'Ydata', this.nosePos(fi,2,1), ...
+                        'Marker', '.', 'MarkerSize', 6, 'Color', c);
                 end
             end 
         end
@@ -269,45 +301,53 @@ classdef MouseTrackerKF < handle
             if ~exist('frames', 'var') || isempty(frames); frames = 1:this.nFrames; end
             fh = figure;
             ah = axes('position', [.1, .1, .7 .8]);
-            cm = colormap(hsv(this.nFrames));
-            sorted_dir = sort(this.direction); %sorted vector for colormapping
-            %pathIm = this.plotPaths()*255;
-            %redIm = min(this.avgFrame + pathIm, 255);
-            %blueIm = max(this.avgFrame - pathIm, 0);
-            %bgIm = cat(3, blueIm, blueIm, redIm);
             bgIm = this.plotPathsOnBg();
             imshow(bgIm); hold on;
-            %imshow(this.avgFrame); hold on;
             xlim([0 this.width]);
             ylim([0 this.height]);
-            % unfortunately, I haven't been able to figure out an easier way to do colormapping of points plotted over
-            % a B&W image, without the points and the image sharing the same colormap.  So, here I'm just plotting every
-            % point separately, with a color indicative of the velocity of the animal.
             for ii=1:length(frames)
                 fi = frames(ii);
-                ci = find(sorted_dir == this.direction(fi), 1, 'first');
                 if ~isnan(this.noseblob(fi))
-                    line('Xdata', this.areas(fi,this.noseblob(fi)).Centroid(1), 'Ydata', ...
+                    line('Parent', ah, 'Xdata', this.areas(fi,this.noseblob(fi)).Centroid(1), 'Ydata', ...
                         this.areas(fi,this.noseblob(fi)).Centroid(2), 'Marker', '.', 'MarkerSize', 8, 'Color', plotblue);
-                end
-                if ~isnan(ci)
-                    %line('Xdata', this.COM(fi,1,1), 'Ydata', this.COM(fi,2,1), 'Marker', '.', 'MarkerSize', 10, 'Color', cm(ci,:));
-                    %line('Xdata', this.COM(fi,1,1), 'Ydata', this.COM(fi,2,1), 'Marker', '.', 'MarkerSize', 10, 'Color', 'r');
-                    %line('parent', ah2, 'Xdata', this.COM(ii,1), 'Ydata', this.COM(ii,2), 'Marker', '.', 'MarkerSize', 10, 'Color', cm(ci,:));
                 end
             end 
             title(this.videoFN);
-            % Make another graph with the color scale
-%             fh2 = figure;
-%             ah2 = axes('position', [.1 .1 .7 .8], 'visible', 'off');
-%             cm = colormap(hsv(this.nFrames));
-%             axes(ah2);
-%             pcolor(repmat(sorted_dir(:), [1 3]));
-% %             line('parent', ah2, 'ydata', sorted_dir, 'xdata', 1:length(sorted_dir)); 
-%             colorbar;
         end
-        
-        % ------------------------------------------------------------------------------------------------------
+        % ------------------------------------------------------------------------------------------    
+        function [nb_stat, nose_bright] = getNoseBrightness(this, frames, operation)
+            % operation is a function pointer to operation to be performed
+            % on the set of nose pixels 
+            nSegs = ceil(length(frames)/this.framesPerSeg);
+            movieDone = 0; 
+            dbg = 0;
+            nose_bright = NaN*zeros(length(frames), this.MAX_SIZE_THRESH);
+            nb_stat = NaN*zeros(length(frames),1);
+            for jj = 1:nSegs %divide the computation up into segments so that there is never too much in memory at once
+                first = (jj-1)*this.framesPerSeg + 1; %first frame of segment
+                if (jj == nSegs) % the last frame
+                    last = length(frames);
+                else
+                    last = (jj)*this.framesPerSeg;
+                end
+                disp(sprintf('Finding brightnesses for frames %d - %d', first, last));
+                segFrames = frames(first:last);
+                
+                frameArray = this.readMovieSection(segFrames,'diff');
+                for ii = 1:(last-first)
+                    fi = frames(first+ii-1);
+                    if ~isnan(this.noseblob(fi))
+                        ni = this.areas(fi, this.noseblob(fi)).PixelIdxList;
+                        frame = frameArray(:,:,ii);
+                        nose_px = frame(ni);
+                        nose_bright(first+ii-1, 1:length(nose_px)) = nose_px; 
+                        nb_stat(first+ii-1) = operation(nose_px(:));
+                    end
+                end
+                        
+            end
+        end
+        % -------------------------------------------------------------------------------------------
         function plotDirection(this, frames)
             % function plotDirection(this, frames)
             plotblue = [.3, .6, 1]; % a nice blue color
@@ -316,13 +356,8 @@ classdef MouseTrackerKF < handle
             ah = axes('position', [.1, .1, .7 .8]);
             cm = colormap(hsv(this.nFrames));
             sorted_dir = sort(this.direction); %sorted vector for colormapping
-            %pathIm = this.plotPaths()*255;
-            %redIm = min(this.avgFrame + pathIm, 255);
-            %blueIm = max(this.avgFrame - pathIm, 0);
-            %bgIm = cat(3, blueIm, blueIm, redIm);
             bgIm = this.plotPathsOnBg();
             imshow(bgIm); hold on;
-            %imshow(this.avgFrame); hold on;
             xlim([0 this.width]);
             ylim([0 this.height]);
             % unfortunately, I haven't been able to figure out an easier way to do colormapping of points plotted over
@@ -354,7 +389,11 @@ classdef MouseTrackerKF < handle
         
         % ---------------------------------------------------------------------------
         function plotFollowing(this, frames, dist_thresh, textflag)
+            % function plotFollowing(this, frames, dist_thresh, textflag)
             % plot the following segments based on the following information 
+            if isempty(frames)
+                frames = 1:this.nFrames;
+            end
             [dists, fframes] = this.distanceOnTrail(frames,1,dist_thresh);
             this.plotNosePosition(frames); hold on;
             for i=1:size(fframes,1)
@@ -368,8 +407,12 @@ classdef MouseTrackerKF < handle
         end
         
         % ---------------------------------------------------------------------------
-        function plotFollowingSide(this, frames, dist_thresh, textflag)
-            % plot the following segments based on the following information 
+        function ah = plotFollowingSide(this, frames, dist_thresh, textflag)
+            % function ah = plotFollowingSide(this, frames, dist_thresh, textflag)
+            % plot the following segments based on the following information
+            if isempty(frames)
+                frames = 1:this.nFrames;
+            end
             [dists, fframes] = this.distanceOnTrail(frames,1,dist_thresh);
             this.plotNosePosition; hold on;
             for i=1:size(fframes,1)
@@ -385,11 +428,12 @@ classdef MouseTrackerKF < handle
                     text(mean(np(:,1)), mean(np(:,2)), num2str(dists(i)), 'Color', 'w', 'FontSize', 12);
                 end
             end
+            ah = gca;
         end
         
         % ---------------------------------------------------------------------------
         function plotOrientation(this, frames)
-            % function plotVelocity(this)
+            % function plotOrientation(this, frames)
             if ~exist('frames', 'var') || isempty(frames); frames = 1:this.nFrames; end
             figure;
             cm = colormap(hsv(this.nFrames));
@@ -420,7 +464,7 @@ classdef MouseTrackerKF < handle
         
         % ------------------------------------------------------------------------------------------------------
         function writeMovie(this, filename, movieType, frames, dispCrop)
-            % function writeMovie(this, filename)
+            % function writeMovie(this, filename, movieType, frames, dispCrop)
             % Writes a movie of the tracked mouse to disk at the given location
             if isempty(frames)
                 frames = 1:this.nFrames;
@@ -438,8 +482,13 @@ classdef MouseTrackerKF < handle
         end
         
         % ------------------------------------------------------------------------------------------------------
-        function showMovie(this, movieType, frames, dispCrop)
+        function showMovie(this, movieType, frames, varargin)
             % function showMovie(this, useBinMovie, frameRange)
+            if length(varargin) >=1
+                dispCrop = varargin{1};
+            else
+                dispCrop = [];
+            end
             fh = figure;
             this.exitMovie = 0;
             set(fh, 'WindowKeyPressFcn', @this.exitMovieLoop);
@@ -498,9 +547,9 @@ classdef MouseTrackerKF < handle
             
             nSegs = ceil(length(frames)/this.framesPerSeg);
             movieDone = 0; 
+            dbg = 0;
             
             for jj = 1:nSegs %divide the computation up into segments so that there is never too much in memory at once
-                %if(movieDone); break; end
                 first = (jj-1)*this.framesPerSeg + 1; %first frame of segment
                 if (jj == nSegs) % the last frame
                     last = length(frames);
@@ -510,7 +559,7 @@ classdef MouseTrackerKF < handle
                 segFrames = frames(first:last);
                 
                 disp(['Finding mouse in segment ' num2str(jj)]);
-                frameArray = this.readMovieSection(segFrames,'bin');
+                frameArray = this.readMovieSection(segFrames,'bin', this.default_thresh);
                 segFrames = segFrames(1:size(frameArray, 3));
                 newFrameCount(jj) = this.nFrames;
                 trimmed(jj) = 0; 
@@ -521,11 +570,6 @@ classdef MouseTrackerKF < handle
                     trimmed(jj) = 1;
                     %movieDone = 1; %don't read movie anymore
                 end
-%                 if isempty(this.areas) %initialize areas field if it hasn't been
-%                     areas = regionprops(frameArray(:,:,1), this.regprops); %built-in that gives stats on binary images
-%                     areas = areas(1);
-%                     this.areas = repmat(areas, this.nFrames, this.maxBlobs); % make a struct arraay length of nFrames
-%                 end
                 for ii = 1:length(segFrames)  %have to work 1 frame at a time, unfortunately
                     lm = bwlabel(frameArray(:,:,ii)); %label matrix
                     fi = segFrames(ii);
@@ -543,18 +587,22 @@ classdef MouseTrackerKF < handle
                         for kk=1:length(temp_reg)
                             temp_reg(kk).Orientation = -temp_reg(kk).Orientation; %the returned orientation is not correct, need to correct
                         end
-                        this.nblobs(fi) = min(this.maxBlobs, length(temp_reg)); 
+                        this.nblobs(fi) = min(this.maxBlobs, length(temp_reg)); %take the biggest N blobs
                         this.areas(segFrames(ii),1:this.nblobs(fi)) = temp_reg(1:this.nblobs(fi)); %only keep the top sized blobs
-                        %temp_pos = [];
-                        %for kk=1:this.nblobs(fi)
-                        %    temp_pos = cat(1, temp_pos, temp_reg(kk).PixelList);
-                        %    positions = permute(reshape([temp_reg(1:this.nblobs(fi)).Centroid], 2,[]), [3 1 2]);
-                        %    this.COM(fi, :, 1:this.nblobs(fi)) = positions;
-                        %    this.orient(fi, kk) = [this.areas(fi,kk).Orientation]./ 180 * pi; %this is the rough estimate   
-                        %end
-                        %this.bodyCOM(fi, :) = mean(temp_pos);
+                       
                         this.detectTail(fi);
-                        if (1 == 0) %debug plotting
+                        % 1) get the center of mass of animal
+                        this.bodyCOM(fi,:) = this.computeBodyPos(fi,1);
+                        % 2) get the nose blob
+                        this.nosePos(fi,:) = this.findNose(fi);
+                        % 3) compare to prediction
+                        if this.nosePos(fi,:) ~= this.nosePos(fi,:)
+                            % 4) correct if necessary
+                            
+                        end
+                        
+                        % 5) make prediction for next frame
+                        if dbg %debug plotting
                            bin_im = zeros(this.height, this.width); 
                            for kk=1:length(temp_reg)
                                bin_im(temp_reg(kk).PixelIdxList) = kk;
@@ -575,7 +623,7 @@ classdef MouseTrackerKF < handle
                 frames = frames(1:this.nFrames); %just trim them off the end - this error only happens for last seg
                 this.trimFields(); %trim the object property arrays
             end
-            this.refineTracking(frames);    
+            %this.refineTracking(frames);    
         end
         
         % ------------------------------------------------------------------------------------------------------
@@ -592,6 +640,53 @@ classdef MouseTrackerKF < handle
             this.vel(frames, :) = this.computeVelocity(frames);
         end
         
+        % -----------------------------------------------------------------------------------------------------
+        function detectTail(this, frames)
+            % Trying to detect if we can see a tail on a frame by frame basis
+            for ii=1:length(frames)
+                regions = this.areas(frames(ii),:);
+                % going to find the blob with the highest eccentricity to be the tail
+                ecc = [regions.MajorAxisLength]./[regions.MinorAxisLength];
+                [max_ecc, maxi] = nanmax(ecc);
+                this.tailblob(frames(ii)) = maxi;
+                if max_ecc>3.5 %this is just an empirically defined threshold value
+                    this.tailVisible(frames(ii)) = 1;
+                else
+                    this.tailVisible(frames(ii)) = 0;
+                end
+            end
+        end
+        % ------------------------------------------------------------------------------------------------------
+        function nosep = findNose(this, frames)
+        % function nosep = findNose(this, frames, blobi)
+        %
+        % So, the method for finding which blob is the nose is to take the tail and body center and take the 
+        % distance along that vector for every blob centroid. The one with the largest is the nose.
+            nosep = NaN* zeros(length(frames), 2);
+            for ii = 1:length(frames)
+                fi = frames(ii);
+                if (this.nblobs(fi) > 3) %only works if there are enough things to track
+                    if this.tailVisible(fi) && (this.nblobs(fi) > 2)%we can only do this first method if the tail is present
+                        % compute the vector from tail to body center
+                        bodyVect = this.bodyCOM(fi,:) - this.areas(fi,this.tailblob(fi)).Centroid;
+                        dist = [];
+                        for jj=1:this.nblobs(fi)
+                            areaVect = this.areas(fi,jj).Centroid - this.areas(fi,this.tailblob(fi)).Centroid;
+                            dist(jj) = dot(areaVect, bodyVect);
+                        end
+                        [maxd, maxi] = max(dist); %the maximum distance and ind along tail-body vector of each blob  
+                        this.noseblob(fi) = maxi; 
+                        nosep(ii,:) = this.areas(fi,this.noseblob(fi)).Centroid; % The nose is the farthest along vector
+                    end
+                end
+            end
+            % putting in a maximum distance criterion of 500 px away from last frame 
+            dists = diff(nosep,1,1);
+            dists = sqrt(sum(dists.^2,2));
+            toofar = dists > 100;
+            nosep(toofar,:) = NaN*zeros(sum(toofar), 2);
+        end
+        
         % ------------------------------------------------------------------------------------------------------
         function bodyCOM = computeBodyPos(this, frames, includeTail)
             %
@@ -600,18 +695,21 @@ classdef MouseTrackerKF < handle
             for i = 1:length(frames)
                 fi = frames(i);
                 taili = this.tailblob(fi);
-                if (isnan(taili)) taili = this.maxBlobs + 1; end
+                if (isnan(taili)) taili = this.maxBlobs + 1; end %just assign it out of range for check
                 temp_pos = [];
                 temp_areas = this.areas(fi,1:this.nblobs(fi));
                 for j=1:this.nblobs(fi)
                     this.orient(fi, j) = [this.areas(fi,j).Orientation]./ 180 * pi; %this is the rough estimate
+                    positions = permute(reshape([temp_areas(j).Centroid], 2,[]), [3 1 2]);
+                    this.COM(fi, :, j) = positions;
                     if (includeTail) || (j ~= taili) %exclude the tail in the body position calculation
-                        temp_pos = cat(1, temp_pos, temp_areas(j).PixelList);
-                        positions = permute(reshape([temp_areas(1:this.nblobs(fi)).Centroid], 2,[]), [3 1 2]);
-                        this.COM(fi, :, 1:this.nblobs(fi)) = positions;
+                        %temp_pos = cat(1, temp_pos, temp_areas(j).PixelList);
+                        temp_pos = cat(1, temp_pos, positions);
+                        
                         %this.orient(fi, j) = [this.areas(fi,j).Orientation]./ 180 * pi; %this is the rough estimate
                     end
                 end
+                %bodyCOM(i, :) = mean(this.COM(fi,:,:),3);
                 bodyCOM(i, :) = mean(temp_pos);
             end
         end
@@ -813,52 +911,7 @@ classdef MouseTrackerKF < handle
             this.nblobs = this.nblobs(frames);
             
         end
-        % -----------------------------------------------------------------------------------------------------
-        function detectTail(this, frames)
-            % Trying to detect if we can see a tail on a frame by frame basis
-            for ii=1:length(frames)
-                regions = this.areas(frames(ii),:);
-                % going to find the blob with the highest eccentricity to be the tail
-                ecc = [regions.MajorAxisLength]./[regions.MinorAxisLength];
-                [max_ecc, maxi] = nanmax(ecc);
-                this.tailblob(frames(ii)) = maxi;
-                if max_ecc>3
-                    this.tailVisible(frames(ii)) = 1;
-                else
-                    this.tailVisible(frames(ii)) = 0;
-                end
-            end
-        end
-        % ------------------------------------------------------------------------------------------------------
-        function nosep = findNose(this, frames)
-        % function nosep = findNose(this, frames, blobi)
-        %
-        % So, the method for finding which blob is the nose is to take the tail and body center and take the 
-        % distance along that vector for every blob centroid. The one with the largest is the nose.
-            nosep = NaN* zeros(length(frames), 2);
-            for ii = 1:length(frames)
-                fi = frames(ii);
-                if (this.nblobs(fi) > 1) %only works if there are things to track
-                    if this.tailVisible(fi) && (this.nblobs(fi) > 2)%we can only do this first method if the tail is present
-                        % compute the vector from tail to body center
-                        bodyVect = this.bodyCOM(fi,:) - this.areas(fi,this.tailblob(fi)).Centroid;
-                        dist = [];
-                        for jj=1:this.nblobs(fi)
-                            areaVect = this.areas(fi,jj).Centroid - this.areas(fi,this.tailblob(fi)).Centroid;
-                            dist(jj) = dot(areaVect, bodyVect);
-                        end
-                        [maxd, maxi] = max(dist); %the maximum distance and ind along tail-body vector of each blob  
-                        this.noseblob(fi) = maxi; 
-                        nosep(ii,:) = this.areas(fi,this.noseblob(fi)).Centroid; % The nose is the farthest along vector
-                    end
-                end
-            end
-            % putting in a maximum distance criterion of 500 px away from last frame 
-            dists = diff(nosep,1,1);
-            dists = sqrt(sum(dists.^2,2));
-            toofar = dists > 500;
-            nosep(toofar,:) = NaN*zeros(sum(toofar), 2);
-        end
+        
         
         % ------------------------------------------------------------------------------------------------------
         function removeStaticObjects(this)
@@ -870,7 +923,7 @@ classdef MouseTrackerKF < handle
             limit = round(this.frameRate * 3); %X sec; number of frames necessary to be eliminated as static
             dist_thresh = 1; %What do we call the same position, along each axis 
             area_thresh = 15; %the amount that an area can change frame to frame to be counted as the same
-            abs_area_thresh = 50; %the upper bound for the size for deleted objects
+            abs_area_thresh = 30; %the upper bound for the size for deleted objects
             max_block_size = 2^11; %the maximum number of frames processed at once - need to break up for long segments
                                    %for memory reasons
             nblocks = ceil(this.nFrames/max_block_size);
@@ -966,9 +1019,6 @@ classdef MouseTrackerKF < handle
             tempareas = struct('Area',0, 'Centroid',[0 0],'BoundingBox', [0 0 0 0], 'MajorAxisLength',0,...
                 'MinorAxisLength',0, 'Orientation',0,'Extrema',[0 0 0 0], 'PixelIdxList',[], 'PixelList',[],'Perimeter', 0);
             this.areas = repmat(tempareas, this.nFrames, this.maxBlobs); % make a struct arraay length of nFrames
-%             tempareas = regionprops(im2bw(this.avgFrame, graythresh(this.avgFrame)), this.regprops); %built-in that gives stats on binary/gray images
-%             tempareas = tempareas(1);
-%             this.areas = repmat(tempareas, this.nFrames, this.maxBlobs); % make a struct arraay length of nFrames
         end
         
         % ------------------------------------------------------------------------------------------------------
@@ -981,15 +1031,10 @@ classdef MouseTrackerKF < handle
         function detectPaths(this, time, absoluteTime, useAvgFrame)
             % Essentially just calls detectEdgesInFrame twice, once for
             % each path, and saves the results
-            pb = 1;
+            pb = 0;
             
             [this.paths, rew_image] = detectEdgesInFrame(this, time, absoluteTime, useAvgFrame);
-            %this.refinePaths(1);
             [this.paths(2), distract_image] = detectEdgesInFrame(this, time, absoluteTime, useAvgFrame);
-            %this.refinePaths(2);
-            
-            %paths = [rew_path; distract_path];
-            %this.paths = paths;
             
             if (pb)
                 order = [2 1 3];
@@ -1002,6 +1047,12 @@ classdef MouseTrackerKF < handle
                 hold on;
             end
             
+        end
+         % ------------------------------------------------------------------------------------------------------ 
+        function detectRefinePaths(this,time,absoluteTime,useAvgFrame)
+            this.detectPaths(time, absoluteTime, useAvgFrame);
+            this.refinePaths(1);
+            this.refinePaths(2);
         end
         % ------------------------------------------------------------------------------------------------------
         function [e, eimage] = detectEdgesInFrame(this, time, absoluteTime, useAvgFrame)
@@ -1039,7 +1090,9 @@ classdef MouseTrackerKF < handle
             [cx, cy] = ginput; %get 2 points from user interaction
             close(fh);
             
-            ei = edge(gf, 'canny'); %first detect edges
+            [ei, thresh] = edge(gf, 'canny'); %first detect edges
+            %thresh(1) = .8*thresh(2); %inefficient, to detect twice, but I want to adjust the thresh
+            %ei = edge(gf, 'canny', thresh); %first detect edges
             ei = imclose(ei, strel('square', 3)); %morphological close, fills in small (1 px) gaps
             props = {'Area', 'PixelIdxList', 'PixelList'};
             e = regionprops(ei, props); %gets the binary regions defined by the edges
@@ -1166,10 +1219,20 @@ classdef MouseTrackerKF < handle
                 [noseDist, mini] = nanmin(distm, [], 2);
                 closestTrailP = trailPos(mini, :);
                 vects = closestTrailP - nosePos;
-            else
-                noseDist = NaN*zeros(length(frames), 1);
-                vects = NaN*zeros(length(frames), 2);
-                disp('There must be a detected path to calculate distances');
+            else % if there are no paths return zeros, but if there are return a mock path result
+                if isempty(this.paths)
+                    noseDist = NaN*zeros(length(frames), 1);
+                    vects = NaN*zeros(length(frames), 2);
+                    disp('There must be a detected path to calculate distances');
+                else %make a fake trail
+                    nosePos = this.nosePos(frames,:);
+                    fakeTrail = this.makeMirrorPath(this.paths(1));
+                    trailPos = fakeTrail.PixelList;
+                    distm = ipdm(single(nosePos), single(trailPos));
+                    [noseDist, mini] = nanmin(distm, [], 2);
+                    closestTrailP = trailPos(mini, :);
+                    vects = closestTrailP - nosePos;
+                end
             end
             if ~isempty(varargin)
                 thresh_dist = varargin{1}; %varargin 1 is the threshold distance to only return those distances under that
@@ -1288,19 +1351,15 @@ classdef MouseTrackerKF < handle
             pTime = closeFrames/numFrames;
         end
         % ---------------------------------------------------------------------------------------------------
-        function [distTraveled_ret, frameNums_ret] = distanceOnTrail(this, frames, trailNum, threshDist)
-        % function [dists, frames] = distanceOnTrail(this, frames, threshDist) 
+        function followingFrames = getFollowingSegments(this, frames, trailNum, threshDist)
+        % function followingFrames = getFollowingSegments(this, frames, trailNum, threshDist)
         %
-        % Returns the distances travelled along the trail, along with the
-        % frame numbers for the following onset and offset.
-        %[intervals, cont] = this.listToIntervals(frames);
-        %all_frames = frames;
-        %for ii = 1:size(intervals(1))
-            %frames = intervals(ii,1):intervals(ii,2);
+        % Returns the frame segments for which the mouse is following the trail
+        
             if isempty(frames)
                 frames = 1:this.nFrames;
             end
-            traillNum = 1; % Eventually we need 2+ trails
+            %traillNum = 1; % Eventually we need 2+ trails
             if nargin < 4 %default distance
                 threshDist = 10;
             end
@@ -1322,26 +1381,37 @@ classdef MouseTrackerKF < handle
                 frame_end = nnframes(seq_end);
                 if (isempty(frame_end)) frame_end = nnframes(trackingInds(end)); end
                 frameNums = [frame_start(:) frame_end(:)];
-                distTraveled = NaN*zeros(size(frameNums,1),1);
-                for ii=1:size(frameNums,1)
-                    range = frameNums(ii,1):frameNums(ii,2);
-                    pos = this.nosePos(range,:);
-                    point_diffs = diff(pos,1,1);
-                    if isempty(point_diffs)
-                        distTraveled(ii) = 0;
-                    else
-                        distTraveled(ii) = nansum(sqrt(nansum(point_diffs.^2,2)));
-                    end
-                end
             end
-            if isempty(distTraveled)
-                distTraveled = 0;
-                frameNums = [1 1];
-            end 
-            %distTraveled_ret(ii) = distTraveled(ii);
-            distTraveled_ret = distTraveled;
-            frameNums_ret = frameNums;
-        %end
+            followingFrames = frameNums;
+        end
+        % ---------------------------------------------------------------------------------------------------
+        function [distTraveled_ret, frameNums_ret] = distanceOnTrail(this, frames, trailNum, threshDist)
+        % function [dists, frames] = distanceOnTrail(this, frames, threshDist) 
+        %
+        % Returns the distances travelled along the trail, along with the
+        % frame numbers for the following onset and offset.
+        distTraveled = [];
+        frameNums = getFollowingSegments(this, frames, trailNum, threshDist);
+        for ii=1:size(frameNums,1)
+            range = frameNums(ii,1):frameNums(ii,2);
+            pos = this.nosePos(range,:);
+            pos = reshape(pos(~isnan(pos)),[],2); %this is to deal with the
+            % fact that there may be nan position frames in the middle.
+            point_diffs = diff(pos,1,1);
+            if isempty(point_diffs)
+                distTraveled(ii) = 0;
+            else
+                distTraveled(ii) = nansum(sqrt(nansum(point_diffs.^2,2)));
+            end
+        end
+        if isempty(distTraveled)
+            distTraveled = 0;
+            frameNums = [1 1];
+        end
+        %distTraveled_ret(ii) = distTraveled(ii);
+        distTraveled_ret = distTraveled;
+        frameNums_ret = frameNums;
+        end
         
         % ------------------------------------------------------------------------------------------------------
         function turning_total = totalTurning(this, frames)
@@ -1358,7 +1428,7 @@ classdef MouseTrackerKF < handle
             % function showFrame(this, framei, useBinMovie)
             %
             % plots a frame of the movie,
-            if isempty(dispCrop) dispCrop = [1 this.width 1 this.height]; end
+            if isempty(dispCrop) dispCrop = [1 1 this.width this.height]; end
             dbg = 0;
             if strcmp(movieType, 'bin')
                 bf = zeros(this.height, this.width, 'uint8');
@@ -1409,9 +1479,8 @@ classdef MouseTrackerKF < handle
                     [xv,yv] = pol2cart(this.orient(framei), this.vel(framei));
                     quiver(this.areas(framei, this.noseblob(framei)).Centroid(1), this.areas(framei,this.noseblob(framei)).Centroid(2), xv, yv, 0);
                 end
-                %plot(this.nosePos(framei,1), this.nosePos(framei,2), '.y', 'MarkerSize', 12);
             end
-           set(gca, 'xlim', [dispCrop(1:2)], 'ylim', [dispCrop(3:4)]);
+           set(gca, 'xlim', [dispCrop(1) dispCrop(3)], 'ylim', [dispCrop(2) dispCrop(4)]);
         end
         
         
@@ -1445,36 +1514,21 @@ classdef MouseTrackerKF < handle
                     %res(:,:,:,inds) = this.readerObj.read(fi);
                 end
             end
-            %res = res(:,:,1,:); %make grayscale
-             %make grayscale from already grayscale (but 3 channel) movie input
             res = this.applyCrop(res); %crop
-%             vid_struct = mmread(this.videoFN, frames+this.frameRange(1)-1); %this final call is where we compensate for an offset
-%             % sometimes vid_struct comes back as an array with one empty field, fix it
-%             for i=1:length(vid_struct)
-%                 if(isempty(vid_struct(i).frames))
-%                     filled(i) = 0;
-%                 else
-%                     filled(i) = 1;
-%                 end
-%             end
-%             sel = logical(filled);
-%             vid_struct = vid_struct(sel);
-%             
-%             vid_struct = this.convertToGray(vid_struct);
-%            vid_struct = this.applyCrop(vid_struct);
         end
         
         % ------------------------------------------------------------------------------------------------------
-        function movieArray = readMovieSection(this, frames, movieType)
+        function movieArray = readMovieSection(this, frames, movieType, varargin)
         % function movieArray = readMovieSection(this, frames, movieType)
         % 
         % reads a section of movie specified by the frames list.
         % Inputs: frames - a list of frame ranges, formatted like [1 40; 80 100]
         %         movieType - string either 'orig' for original movie, 'diff' for the difference, or 'bin' for the
         %         binary
+        %         varargin - a threshold value if you want to specify that for a binary movie 
             [frame_ints, flag] = this.listToIntervals(frames);
             rawArray = this.readFrames(frame_ints, flag);
-            movieArray = this.processFrameArray(rawArray, 1:length(frames), this.avgFrame, movieType);
+            movieArray = this.processFrameArray(rawArray, 1:length(frames), this.avgFrame, movieType, varargin{:});
         end
         
         % ------------------------------------------------------------------------------------------------------
@@ -1487,6 +1541,97 @@ classdef MouseTrackerKF < handle
             movieArray = movieArray(vert, horiz, :,:);
             
         end
+        
+        % --------------------------------------------------
+        function findMovieFile(this, vidFN)
+            % function findMovieFile(this)
+            %
+            % Exists to find the movie file if the saved .mat file for the
+            % tracking is moved since the VideoReader object saves the absolute
+            % filename of the movie.
+            
+            disp(['Opening new video reader object for: ' vidFN]);
+            this.readerObj = VideoReader(vidFN);
+        end
+        
+        % ---------------------------------------------------
+        function fakePath = makeMirrorPath(this,path)  
+            fakePath.Area = path.Area;
+            PixelList = [this.width - path.PixelList(:,1)+1, this.height - path.PixelList(:,2)+1];
+            fakePath.PixelIdxList= this.height*(PixelList(:,1)-1) + PixelList(:,2);
+            fakePath.PixelList = PixelList;
+        end
+        
+        % ---------------------------------------------------------------------------
+        function [ret_mov, avg_frame, thresh] = processFrameArray(this, rawArray, frame_range, subFrame, movieType, varargin)
+            % returns a  movie using the frames specified in the input. The movie can appear different and
+            % is specified with MOVIETYPE: 'orig' gives the original movie, 'diff' provides a version with a 
+            % frame subtracted, by default the mean frame, 'bin' is a binary thresholded image. There is
+            % an optional argument 'subFrame' specifying a frame to subtract from each frame (leave empty, [], 
+            % if you don't want to specify) in order to improve the thresholding of certain objects. If giving multiple
+            % thresholds, then they will be in the 4th dimension of the array.
+            % RAWARRAY is in the format of dim 1,2 - height,width, 3- frame#.
+            % VARARGIN{1} is the threshold level(s) for the movie, leaving
+            % it out gives the default, and the returned movie is a cell
+            % area of 
+           
+            new_mov = rawArray(:,:,frame_range);
+            %detection settings
+            %thresh(1) = .1; % the threshold level
+            p_mouse = .0007; 
+            erode_size = 3; %the size of erosion mask
+            % boostContrast = 1;
+            % make a movie from the average frame to subtract
+            if ~isempty(subFrame)
+                avg_frame = subFrame;
+            else
+                avg_frame = uint8(round(mean(new_mov,3)));
+            end
+            avg_mov = uint8(repmat(avg_frame, [1 1 size(new_mov,3)]));
+            %diff_mov = imabsdiff(new_mov, avg_mov); %this should give a nice moving blob.
+            diff_mov = new_mov - avg_mov; %this should give a nice moving blob.
+            if(this.boostContrast)
+                diff_mov = increaseMovContrast(diff_mov);
+            end
+            % Set the threshold for making a binary image
+            thresh = this.default_thresh; %.08-.12 have worked well after image normalization
+            if ~isempty(varargin) && ~isempty(varargin{1}) % I'm not exactly sure MATLAB is making empty cells
+                thresh = varargin{1}; 
+                if thresh == 0
+                    % The way we are determining the threshold value is to take the brightest p_mouse
+                    % proportion of pixels
+                    sorted = sort(diff_mov(:), 'descend');
+                    thresh_i = round(p_mouse*length(sorted));
+                    thresh = sorted(thresh_i);
+                    %thresh = .6 * graythresh(diff_mov(:)); % A way of doing auto thresholding
+                end
+            end
+            if strcmp(movieType, 'bin')
+                ret_mov = [];
+                for kk = 1:length(thresh)
+                    bin_mov = diff_mov > thresh(kk);
+                    %bin_mov = false(size(diff_mov));
+                    nFrames = size(bin_mov,3);
+                    for ii = 1:nFrames
+                        %this is to get rid of the jagged edges due to something regarding movie compression, but also
+                        %removes one pixel around the edge of the contiguous sections of blob
+                        bw = bin_mov(:,:,ii);
+                        %bw = im2bw(diff_mov(:,:,ii),thresh(kk));
+                        bw = imerode(bw, strel('square',erode_size)); 
+                        bin_mov(:,:,ii) = bw;
+                    end
+                    ret_mov = cat(4, ret_mov, bin_mov);
+                end
+            elseif strcmp(movieType, 'diff')
+                ret_mov = diff_mov;
+            else % show the original movie
+                if(this.boostContrast)
+                    new_mov = increaseMovContrast(new_mov);
+                end
+                ret_mov = new_mov;
+            end
+        end
+
     end %Methods
     
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% STATIC METHODS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1509,48 +1654,7 @@ classdef MouseTrackerKF < handle
             avg_frame = uint8(round(mean(new_mov,3)));
         end
         
-        % ---------------------------------------------------------------------------
-        function [ret_mov, avg_frame] = processFrameArray(rawArray, frame_range, subFrame, movieType)
-            % returns a binary thresholded movie using the frames specified in the input. Also there is
-            % an optional argument 'subFrame' specifying a frame to subtract from each frame in order to
-            % improve the thresholding of certain objects. rawArray is in the format of dim1,2 - height,width, 3- frame#.
-            boostContrast = 1; %flag for boosting the contrast
-            new_mov = rawArray(:,:,frame_range);
-            % make a movie from the average frame to subtract
-            if ~isempty(subFrame)
-                avg_frame = subFrame;
-            else
-                avg_frame = uint8(round(mean(new_mov,3)));
-            end
-            avg_mov = uint8(repmat(avg_frame, [1 1 size(new_mov,3)]));
-            diff_mov = imabsdiff(new_mov, avg_mov); %this should give a nice moving blob.
-            %new_mov = new_mov - avg_mov; %this should give a nice moving blob.
-            if(boostContrast)
-                diff_mov = increaseMovContrast(diff_mov);
-            end
-            thresh = .09; %.09; %this seems to work after image normalization, .08
-            if strcmp(movieType, 'bin')
-                ret_mov = false(size(diff_mov));
-                nFrames = size(ret_mov,3);
-                %thresh = graythresh(new_mov)*.9;
-                %thresh = .5*thresh; %changing the thresh a little to include more in the blob (including more tail)
-                for ii = 1:nFrames
-                    %thresh = graythresh(new_mov(:,:,ii)); % threshold for each frame separately
-                    %this is to get rid of the jagged edges due to something regarding movie compression, but also
-                    %removes one pixel around the edge of the contiguous sections of blob
-                    bw = im2bw(diff_mov(:,:,ii),thresh);
-                    %bwf = imerode(bw, strel('square',3)); 
-                    ret_mov(:,:,ii) = bw;
-                end
-            elseif strcmp(movieType, 'diff')
-                ret_mov = diff_mov;
-            else % show the original movie
-                if(boostContrast)
-                    new_mov = increaseMovContrast(new_mov);
-                end
-                ret_mov = new_mov;
-            end
-        end
+        
         
         % ---------------------------------------------------------------------------
         function [intervals, desc] = listToIntervals(list)
@@ -1595,6 +1699,9 @@ classdef MouseTrackerKF < handle
                 movieType = -1;
             end
         end
-
+        
+        
+                
+        
     end % methods - private
 end %classdef

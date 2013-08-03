@@ -687,11 +687,11 @@ classdef MouseTrackerUnder2 < handle
                 temp_areas = this.areas(fi,1:this.nblobs(fi));
                 for j=1:this.nblobs(fi)
                     this.orient(fi, j) = [this.areas(fi,j).Orientation]./ 180 * pi; %this is the rough estimate
+                    positions = permute(reshape([temp_areas(j).Centroid], 2,[]), [3 1 2]);
+                    this.COM(fi, :, j) = positions;
                     if (includeTail) || (j ~= taili) %exclude the tail in the body position calculation
-                        temp_pos = cat(1, temp_pos, temp_areas(j).PixelList);
-                        positions = permute(reshape([temp_areas(1:this.nblobs(fi)).Centroid], 2,[]), [3 1 2]);
-                        this.COM(fi, :, 1:this.nblobs(fi)) = positions;
-                        %this.orient(fi, j) = [this.areas(fi,j).Orientation]./ 180 * pi; %this is the rough estimate
+                        temp_pos = cat(1, temp_pos, temp_areas(j).PixelList); %for making the mean weighted by size
+                        %temp_pos = cat(1, temp_pos, positions); %making it not weighted by size
                     end
                 end
                 bodyCOM(i, :) = mean(temp_pos);
@@ -1412,7 +1412,7 @@ classdef MouseTrackerUnder2 < handle
             % function showFrame(this, framei, useBinMovie)
             %
             % plots a frame of the movie,
-            if isempty(dispCrop) dispCrop = [1 this.width 1 this.height]; end
+            if isempty(dispCrop) dispCrop = [1 1 this.width this.height]; end
             dbg = 0;
             if strcmp(movieType, 'bin')
                 bf = zeros(this.height, this.width, 'uint8');
@@ -1464,7 +1464,7 @@ classdef MouseTrackerUnder2 < handle
                     quiver(this.areas(framei, this.noseblob(framei)).Centroid(1), this.areas(framei,this.noseblob(framei)).Centroid(2), xv, yv, 0);
                 end
             end
-           set(gca, 'xlim', [dispCrop(1:2)], 'ylim', [dispCrop(3:4)]);
+           set(gca, 'xlim', [dispCrop(1) dispCrop(3)], 'ylim', [dispCrop(2) dispCrop(4)]);
         end
         
         
