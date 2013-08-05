@@ -41,6 +41,7 @@ classdef MouseTrackerKF < handle
         % The list of properties detected in the binary image of each frame
         regprops = {'Area', 'Centroid', 'BoundingBox','MajorAxisLength','MinorAxisLength','Orientation','Extrema','PixelIdxList','PixelList','Perimeter'};
         blobsToDelete = []; %list for debugging purposes of those blobs to delete - to mark them.
+        kf = struct('nstates', {}, 'nob', {}, 's', {});
     end
     properties (SetAccess = private)
         exitMovie = 0
@@ -104,9 +105,7 @@ classdef MouseTrackerKF < handle
             else %initialize normally 
                 % Read just a couple of frames to get an idea of video speeds, etc.
                 this.readerObj = VideoReader(this.videoFN);
-                
-                %vid_struct = mmread(this.videoFN, 1); 
-                %vid_struct = vid_struct(1); %sometimes returning as array.  Weird.
+               
                 this.frameRate = this.readerObj.FrameRate;
                 this.nativeWidth = this.readerObj.Width;
                 this.nativeHeight = this.readerObj.Height;
@@ -141,8 +140,6 @@ classdef MouseTrackerKF < handle
                 % read in enough frames to create the average frame
                 %avgRange = this.frameRange(1):this.avgSubsample:this.frameRange(end);
                 disp('MouseTracker: reading movie to make average frame');
-                %vid_struct = mmread(this.videoFN, avgRange);     
-                %vid_struct = this.convertToGray(vid_struct);
                 avgRange = 1:this.avgSubsample:length(this.frameRange);
                 while (length(avgRange) < 20)
                     this.avgSubsample = floor(this.avgSubsample/2);
@@ -150,18 +147,36 @@ classdef MouseTrackerKF < handle
                 end
                 vidArray = this.readFrames(this.listToIntervals(avgRange), 'discontinuous');
                 this.avgFrame = uint8(mean(vidArray, 3));
-                %this.avgFrame = mean(vidArray,3);
-                %this.averageFrame(vidArray, 1:length(vid_struct.frames));
 
                 % Populate the fields with empty data
                 this.nFrames = length(this.frameRange);
                 this.times = ((1:this.nFrames)-1)/this.frameRate; % time vector starts at 0
-                %this.times = ((this.frameRange(1):this.frameRange(2))-1)/this.frameRate + t_offset;
                 %initialize areas
                 this.clearCalcData();
             end
         end %function MouseTracker
-        
+        % ------------------------------------------------------------------------------------------------------
+        function initKalmanFilter(this)
+        % function initKalmanFilter(this)
+        %
+        % Initialization of Kalman filter parameters
+            this.kf = struct('nstates', {}, 'nob', {}, 's', {});
+            zs = 4;
+            this.kf(1).nstates = zs;
+            this.kf(1).nob = 2;
+            this.kf(1).s.A = eye(zs);
+            this.kf(1).s.A = [1 0 1 0; 0 1 0 1; 0 0 1 0; 0 0 0 1]; 
+            this.kf(1).s.z = nan*zeros(zs,1); 
+            this.kf(1).s.x = nan*zeros(zs,1); 
+            this.kf(1).s.H = eye(zs);
+            this.kf(1).s.R = eye(zs); %measurement error covariance
+            %this.kf.s.P = cov(np');
+            this.kf(1).s.P = eye(zs);
+            this.kf(1).s.u = nan*zeros(zs,1);
+            this.kf(1).s.B = eye(zs);
+            this.kf(1).s.Q = eye(zs);
+
+        end
         % ------------------------------------------------------------------------------------------------------
         function [wantedCOM, nose] = mousePosition(this, time_range)
         % function [wantedCOM, nose] = mousePosition(this, time_range)    
@@ -212,11 +227,6 @@ classdef MouseTrackerKF < handle
             if ~exist('frames', 'var') || isempty(frames); frames = 1:this.nFrames; end
             figure;
             sorted_vel = sort(this.vel); %sorted vector of speeds for colormapping
-%             pathIm = this.plotPaths()*255;
-%             redIm = min(this.avgFrame + pathIm, 255);
-%             blueIm = max(this.avgFrame - pathIm, 0);
-%             bgIm = cat(3, blueIm, blueIm, redIm);
-%             imshow(bgIm); hold on;
             imshow(this.plotPathsOnBg()); hold on;
             xlim([0 this.width]); %fit the axes to the image
             ylim([0 this.height]);
@@ -293,7 +303,28 @@ classdef MouseTrackerKF < handle
                 end
             end 
         end
-        
+        function plotFilterPosition(this,frames)
+        % function plotFilterPosition(this,frames)
+            plotblue = [.3, .6, 1]; % a nice blue color
+            if ~exist('frames', 'var') || isempty(frames); frames = 1:this.nFrames; end
+            fh = figure;
+            ah = axes('position', [.1, .1, .7 .8]);
+            bgIm = this.plotPathsOnBg();
+            imshow(bgIm); hold on;
+            xlim([0 this.width]);
+            ylim([0 this.height]);
+            filt_x = [this.kf.s.x]; %the kalman filter positions
+            filt_x = filt_x(1:2,:)';
+            for ii=1:length(frames)
+                fi = frames(ii);
+                if ~isnan(this.noseblob(fi))
+                    line('Parent', ah, 'Xdata', this.areas(fi,this.noseblob(fi)).Centroid(1), 'Ydata', ...
+                        this.areas(fi,this.noseblob(fi)).Centroid(2), 'Marker', '.', 'MarkerSize', 8, 'Color', plotblue);
+                    line('Parent', ah, 'Xdata', filt_x(fi,1), 'Ydata', filt_x(fi,2), 'Marker', '.', 'MarkerSize', 8, 'Color', [1 0 0]);
+                end
+            end 
+            title(this.videoFN);
+        end
         % ------------------------------------------------------------------------------------------------------
         function plotNosePosition(this, frames)
             % function plotDirection(this, frames)
@@ -548,6 +579,7 @@ classdef MouseTrackerKF < handle
             nSegs = ceil(length(frames)/this.framesPerSeg);
             movieDone = 0; 
             dbg = 0;
+            err_thresh = 6;
             
             for jj = 1:nSegs %divide the computation up into segments so that there is never too much in memory at once
                 first = (jj-1)*this.framesPerSeg + 1; %first frame of segment
@@ -596,12 +628,27 @@ classdef MouseTrackerKF < handle
                         % 2) get the nose blob
                         this.nosePos(fi,:) = this.findNose(fi);
                         % 3) compare to prediction
-                        if this.nosePos(fi,:) ~= this.nosePos(fi,:)
-                            % 4) correct if necessary
-                            
+                        s = this.kf.s(fi);
+                        pred_x = s.x(1:2)';
+                        if( fi == 1) %if first frame, make sure that things are good
+                                this.kf.s(fi).z = [this.nosePos(fi,:) 0 0]'; 
+                                pred_x = this.kf.s(fi).z(1:2)';
                         end
-                        
+                        if pdist2(pred_x, this.nosePos(fi,:)) > err_thresh
+                            % They difference between prediction and detected position is too big, so try
+                            % to correct
+                            this.correctDetection(fi, this.nosePos(fi,:), pred_x);
+                        else % if it's within acceptable error, just update the filter with the proper z in order to predict next frame
+                            if fi>1
+                                this.kf.s(fi).z = [this.nosePos(fi,:) this.nosePos(fi,:)-this.nosePos(fi-1,:)]';
+                            else
+                                this.kf.s(fi).z = [this.nosePos(fi,:) 0 0]';
+                            end
+                        end
                         % 5) make prediction for next frame
+                        if fi < this.nFrames
+                            this.kf.s(fi+1) = kalmanf(this.kf.s(fi));
+                        end
                         if dbg %debug plotting
                            bin_im = zeros(this.height, this.width); 
                            for kk=1:length(temp_reg)
@@ -614,6 +661,9 @@ classdef MouseTrackerKF < handle
                     else %this is a kluge - unclear what the best thing to do is if you don't detect a blob
                         subI = max(1, ii-1);
                         this.areas(segFrames(ii)) = this.areas(frames(subI)); %this will error on ii=1
+                        if fi < this.nFrames
+                            this.kf.s(fi+1) = kalmanf(this.kf.s(fi)); %let's update the Kalman Filter anyway
+                        end
                     end
                 end
                 clear frameArray;
@@ -626,6 +676,35 @@ classdef MouseTrackerKF < handle
             %this.refineTracking(frames);    
         end
         
+        function newPos = correctDetection(this, frame, detectedPos, predictedPos)
+            err_thresh = 5;
+            areas = this.areas(frame,:);
+            centers = [areas.Centroid];
+            centers = reshape(centers, 2,[])';
+            D = pdist2(predictedPos, centers); %distances from prediction to all centers
+            [mind, mini] = nanmin(D);
+            prevPos = [NaN NaN NaN NaN];
+            if frame > 1
+                prevPos = this.nosePos(frame-1,:);
+            end
+            if isnan(this.noseblob(frame)) && mind < err_thresh %if we missed the nose blob for some reason
+                newPos = centers(mini, :);
+                this.nosePos(frame, :) = newPos;
+                this.noseBlob(frame) = mini; 
+                this.kf.s(frame).z = [newPos newPos-prevPos]';
+            elseif mini ~= this.noseblob(frame) && mind < err_thresh %if a different blob is closer to the prediction
+                % then we will call that the nose instead
+                newPos = centers(mini, :);
+                this.nosePos(frame, :) = newPos;
+                this.noseblob(frame) = mini; 
+                this.kf.s(frame).z = [newPos newPos-prevPos]';
+            elseif mini == this.noseblob(frame) && mind > err_thresh
+                % do nothing for now
+                % eventually want to rethreshold the frame
+            end
+            
+        end
+
         % ------------------------------------------------------------------------------------------------------
         function refineTracking(this, frames)
         % function refineTracking(this, frames)
@@ -1019,6 +1098,8 @@ classdef MouseTrackerKF < handle
             tempareas = struct('Area',0, 'Centroid',[0 0],'BoundingBox', [0 0 0 0], 'MajorAxisLength',0,...
                 'MinorAxisLength',0, 'Orientation',0,'Extrema',[0 0 0 0], 'PixelIdxList',[], 'PixelList',[],'Perimeter', 0);
             this.areas = repmat(tempareas, this.nFrames, this.maxBlobs); % make a struct arraay length of nFrames
+            this.initKalmanFilter();
+
         end
         
         % ------------------------------------------------------------------------------------------------------
