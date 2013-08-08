@@ -37,7 +37,7 @@ classdef MouseTrackerKF < handle
         paths %binary areas for the detected paths
         boostContrast = 1; %video processing option, boolean switch to boost contrast of the movie on each frame
         default_thresh = 0;
-        body_thresh = .1;
+        used_thresh = 0;
         % The list of properties detected in the binary image of each frame
         regprops = {'Area', 'Centroid', 'BoundingBox','MajorAxisLength','MinorAxisLength','Orientation','Extrema','PixelIdxList','PixelList','Perimeter'};
         blobsToDelete = []; %list for debugging purposes of those blobs to delete - to mark them.
@@ -172,7 +172,7 @@ classdef MouseTrackerKF < handle
             this.kf(1).s.R = eye(zs); %measurement error covariance
             %this.kf.s.P = cov(np');
             this.kf(1).s.P = eye(zs);
-            this.kf(1).s.u = nan*zeros(zs,1);
+            this.kf(1).s.u = zeros(zs,1);
             this.kf(1).s.B = eye(zs);
             this.kf(1).s.Q = eye(zs);
 
@@ -303,6 +303,7 @@ classdef MouseTrackerKF < handle
                 end
             end 
         end
+        % ------------------------------------------------------------------------------------------------------
         function plotFilterPosition(this,frames)
         % function plotFilterPosition(this,frames)
             plotblue = [.3, .6, 1]; % a nice blue color
@@ -387,6 +388,7 @@ classdef MouseTrackerKF < handle
             ah = axes('position', [.1, .1, .7 .8]);
             cm = colormap(hsv(this.nFrames));
             sorted_dir = sort(this.direction); %sorted vector for colormapping
+            [cm cinds] = getIndexedColors('jet', this.direction(frames), 1);
             bgIm = this.plotPathsOnBg();
             imshow(bgIm); hold on;
             xlim([0 this.width]);
@@ -398,8 +400,8 @@ classdef MouseTrackerKF < handle
                 fi = frames(ii);
                 ci = find(sorted_dir == this.direction(fi), 1, 'first');
                 if ~isnan(this.noseblob(fi))
-                    line('Xdata', this.areas(fi,this.noseblob(fi)).Centroid(1), 'Ydata', ...
-                        this.areas(fi,this.noseblob(fi)).Centroid(2), 'Marker', '.', 'MarkerSize', 8, 'Color', cm(ci,:));
+                    line('Xdata', this.nosePos(fi,1), 'Ydata', ...
+                        this.nosePos(fi,2), 'Marker', '.', 'MarkerSize', 8, 'Color', cm(cinds(ii),:));
                 end
                 if ~isnan(ci)
                     %line('Xdata', this.COM(fi,1,1), 'Ydata', this.COM(fi,2,1), 'Marker', '.', 'MarkerSize', 10, 'Color', cm(ci,:));
@@ -411,7 +413,7 @@ classdef MouseTrackerKF < handle
             % Make another graph with the color scale
             fh2 = figure;
             ah2 = axes('position', [.1 .1 .7 .8], 'visible', 'off');
-            cm = colormap(hsv(this.nFrames));
+            colormap(cm);
             axes(ah2);
             pcolor(repmat(sorted_dir(:), [1 3]));
 %             line('parent', ah2, 'ydata', sorted_dir, 'xdata', 1:length(sorted_dir)); 
@@ -580,6 +582,7 @@ classdef MouseTrackerKF < handle
             movieDone = 0; 
             dbg = 0;
             err_thresh = 6;
+            cb = 0;
             
             for jj = 1:nSegs %divide the computation up into segments so that there is never too much in memory at once
                 first = (jj-1)*this.framesPerSeg + 1; %first frame of segment
@@ -622,29 +625,35 @@ classdef MouseTrackerKF < handle
                         this.nblobs(fi) = min(this.maxBlobs, length(temp_reg)); %take the biggest N blobs
                         this.areas(segFrames(ii),1:this.nblobs(fi)) = temp_reg(1:this.nblobs(fi)); %only keep the top sized blobs
                        
-                        this.detectTail(fi);
-                        % 1) get the center of mass of animal
-                        this.bodyCOM(fi,:) = this.computeBodyPos(fi,1);
-                        % 2) get the nose blob
-                        this.nosePos(fi,:) = this.findNose(fi);
-                        % 3) compare to prediction
-                        s = this.kf.s(fi);
+                        this.detectTail(fi); 
+                        this.bodyCOM(fi,:) = this.computeBodyPos(fi,1); % 1) get the center of mass of animal
+                        this.nosePos(fi,:) = this.findNose(fi); % 2) get the nose blob
+                        s = this.kf.s(fi); % 3) compare to prediction
                         pred_x = s.x(1:2)';
                         if( fi == 1) %if first frame, make sure that things are good
                                 this.kf.s(fi).z = [this.nosePos(fi,:) 0 0]'; 
                                 pred_x = this.kf.s(fi).z(1:2)';
                         end
-                        if pdist2(pred_x, this.nosePos(fi,:)) > err_thresh
-                            % They difference between prediction and detected position is too big, so try
-                            % to correct
-                            this.correctDetection(fi, this.nosePos(fi,:), pred_x);
-                        else % if it's within acceptable error, just update the filter with the proper z in order to predict next frame
-                            if fi>1
-                                this.kf.s(fi).z = [this.nosePos(fi,:) this.nosePos(fi,:)-this.nosePos(fi-1,:)]';
-                            else
-                                this.kf.s(fi).z = [this.nosePos(fi,:) 0 0]';
+                        if (pdist2(pred_x, this.nosePos(fi,:)) > err_thresh) || isnan(this.nosePos(fi,1))
+                            % The difference between prediction and detected position is too big, so try
+                            % to correct (or the nose wasn't found)
+                            if cb
+                                this.correctDetection(fi, this.nosePos(fi,:), pred_x);
                             end
                         end
+                        % just update the filter with the proper z in order to predict next frame
+                        if fi>1 %compute frame-by-frame velocities
+                            this.bodyVel(fi, :) = this.bodyCOM(fi,:) - this.bodyCOM(fi,:);
+                            this.noseVel(fi, :) = this.nosePos(fi,:)-this.nosePos(fi-1,:);
+                            if isnan(this.nosePos(fi-1,1))
+                                vel = [0 0];
+                            else
+                                vel = this.noseVel(fi, :);
+                            end
+                        else
+                            vel = [0 0];
+                        end
+                        this.kf.s(fi).z = [this.nosePos(fi,:) vel]';
                         % 5) make prediction for next frame
                         if fi < this.nFrames
                             this.kf.s(fi+1) = kalmanf(this.kf.s(fi));
@@ -673,34 +682,38 @@ classdef MouseTrackerKF < handle
                 frames = frames(1:this.nFrames); %just trim them off the end - this error only happens for last seg
                 this.trimFields(); %trim the object property arrays
             end
+            this.computeVelocity(frames);
             %this.refineTracking(frames);    
         end
-        
+        % ------------------------------------------------------------------------------------------------------
         function newPos = correctDetection(this, frame, detectedPos, predictedPos)
-            err_thresh = 5;
+            err_thresh = 7;
             areas = this.areas(frame,:);
             centers = [areas.Centroid];
             centers = reshape(centers, 2,[])';
             D = pdist2(predictedPos, centers); %distances from prediction to all centers
             [mind, mini] = nanmin(D);
-            prevPos = [NaN NaN NaN NaN];
+            prevPos = [0 0];
             if frame > 1
                 prevPos = this.nosePos(frame-1,:);
             end
             if isnan(this.noseblob(frame)) && mind < err_thresh %if we missed the nose blob for some reason
                 newPos = centers(mini, :);
                 this.nosePos(frame, :) = newPos;
-                this.noseBlob(frame) = mini; 
+                this.noseblob(frame) = mini; 
                 this.kf.s(frame).z = [newPos newPos-prevPos]';
+                disp(sprintf('Corrected frame %i from %d, %d   to %d, %d', frame, detectedPos(1), detectedPos(2), newPos(1), newPos(2)));
             elseif mini ~= this.noseblob(frame) && mind < err_thresh %if a different blob is closer to the prediction
                 % then we will call that the nose instead
                 newPos = centers(mini, :);
                 this.nosePos(frame, :) = newPos;
                 this.noseblob(frame) = mini; 
                 this.kf.s(frame).z = [newPos newPos-prevPos]';
+                disp(sprintf('Corrected frame %i from %d, %d   to %d, %d', frame, detectedPos(1), detectedPos(2), newPos(1), newPos(2)));
             elseif mini == this.noseblob(frame) && mind > err_thresh
                 % do nothing for now
                 % eventually want to rethreshold the frame
+                
             end
             
         end
@@ -723,15 +736,28 @@ classdef MouseTrackerKF < handle
         function detectTail(this, frames)
             % Trying to detect if we can see a tail on a frame by frame basis
             for ii=1:length(frames)
-                regions = this.areas(frames(ii),:);
-                % going to find the blob with the highest eccentricity to be the tail
-                ecc = [regions.MajorAxisLength]./[regions.MinorAxisLength];
-                [max_ecc, maxi] = nanmax(ecc);
-                this.tailblob(frames(ii)) = maxi;
-                if max_ecc>3.5 %this is just an empirically defined threshold value
-                    this.tailVisible(frames(ii)) = 1;
+                fi = frames(ii);
+                regions = this.areas(fi,:);
+                maxo = 0;
+                if (fi>1) && this.tailVisible(fi-1) %finding similarity with previously id'd tail 
+                    prev_tail = this.areas(fi-1,this.tailblob(fi-1));
+                    overlap = regionOverlap(prev_tail, regions, this.regprops);
+                    [maxo, maxoi] = max(overlap);
+                end
+                if maxo > .9 %if really similar, we've found another tail
+                    this.tailVisible(fi) = 1;
+                    this.tailblob(fi) = maxoi;
                 else
-                    this.tailVisible(frames(ii)) = 0;
+                    % going to find the blob with the highest eccentricity to be the tail
+                    ecc = [regions.MajorAxisLength]./[regions.MinorAxisLength];
+                    [max_ecc, maxi] = nanmax(ecc);
+                    if max_ecc>4 && regions(maxi).Area > 100%this is just an empirically defined threshold value
+                        this.tailVisible(fi) = 1;
+                        this.tailblob(fi) = maxi;
+                    else
+                        this.tailVisible(fi) = 0;
+                        this.tailblob(fi) = NaN;
+                    end
                 end
             end
         end
@@ -834,17 +860,20 @@ classdef MouseTrackerKF < handle
             % Computes the velocity as the frame by frame difference in position
             
             %in order to get a velocity for the first frame (0,0) position is assumed at frame 0 
-            this.vel = NaN*zeros(size(this.bodyCOM,1),size(this.bodyCOM,3));
-            vel = NaN*zeros(length(frames), size(this.bodyCOM,3));
-            COM = this.computeBodyPos(frames, 0); %try including the tail in the body position for velocity calculation
-            %COM = this.nosePos(frames,:);
-            diff_com = diff(COM, 1, 1); %differences in COM for each x,y position
-            dists = [sqrt(sum(COM(1,:).^2, 2)); sqrt(sum(diff_com.^2, 2))]; %euclidian distances of each frame transition
-            %this.vel(frames) = dists * this.frameRate; % Velocities in px/sec
-            this.vel(frames) = dists;
-            vel = this.vel(frames);
-            diff_com = [COM(1,:); diff_com]; % add the first position to get an equal sized vector
-            this.direction(frames) = cart2pol(diff_com(:,1), diff_com(:,2)); %this is the direction of motion
+            %this.vel = NaN*zeros(size(this.bodyCOM,1),size(this.bodyCOM,3));
+            if frames(1) > 1 %compute velocity from the frame before the range to get all frames requested
+                fr = [frames(1)-1; frames(:)];
+            else
+                fr = [1; frames(:)];
+            end
+            pos = this.bodyCOM(fr,:);
+            diff_pos = diff(pos, 1,1);%differences in each x,y position
+            vel = sqrt(sum(diff_pos.^2, 2));
+            this.vel(fr(2:end)) = vel; % vel is 1 shorter than the fr
+            this.direction = cart2pol(diff_pos(:,1), diff_pos(:,2)); %this is the direction of motion
+            
+            %diff_com = [COM(1,:); diff_com]; % add the first position to get an equal sized vector
+            %this.direction(frames) = cart2pol(diff_com(:,1), diff_com(:,2)); 
         end
         
         % ------------------------------------------------------------------------------------------------------
@@ -1552,7 +1581,7 @@ classdef MouseTrackerKF < handle
                     %quiver(this.COM(framei,1), this.COM(framei,2), u,v, 'LineWidth', 2); %plots an orientation arrow
                 if this.tailVisible(framei)
                     line(this.areas(framei,this.tailblob(framei)).Centroid(1), this.areas(framei,this.tailblob(framei)).Centroid(2), ...
-                        'Marker', 'x', 'Color', 'c','MarkerSize', 12, 'LineWidth',2);
+                        'Marker', 'x', 'Color', 'm','MarkerSize', 12, 'LineWidth',2);
                 end
                 if (~isnan(this.noseblob(framei)))
                     line(this.areas(framei,this.noseblob(framei)).Centroid(1), this.areas(framei,this.noseblob(framei)).Centroid(2), ...
@@ -1685,6 +1714,7 @@ classdef MouseTrackerKF < handle
                     thresh_i = round(p_mouse*length(sorted));
                     thresh = sorted(thresh_i);
                     %thresh = .6 * graythresh(diff_mov(:)); % A way of doing auto thresholding
+                    this.used_thresh = thresh;
                 end
             end
             if strcmp(movieType, 'bin')
