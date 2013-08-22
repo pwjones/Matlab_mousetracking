@@ -2,8 +2,11 @@
 
 %Analysis Parameters
 following_thresh = 20; %px, the distance from the trail the animal can get before it's counted as not following
+MouseTrackerObj = @MouseTrackerKF;
 %vid_list = '3082files.txt';
 vid_list = '9085files.txt';
+vid_list = '9085_100_files.txt';
+
 %vid_list = '3091files.txt';
 %vid_list = '9085_unbaited_files.txt';
 %vid_list = '3083files.txt';
@@ -14,7 +17,8 @@ vid_list = '9085files.txt';
 %hist_trial_range = [35:53; 16:34];
 %hist_trial_range = [87:100; 101:114];
 %hist_trail_range = [41:67; 68:94];
-hist_trial_range = [62:100; 101:139];
+%hist_trial_range = [62:100; 101:139];
+hist_trial_range = [1:10, 1:10];
 
 
 %%%%%%%%%%%%%%%% Start in on doing things  %%%%%%%%%%%%%%%%
@@ -51,7 +55,7 @@ frame_rate = NaN*zeros(nfiles,1);
 for ii = 1:nfiles
     fullname = fullfile(base_fname, fnames{ii});
     
-    mt = MouseTrackerUnder2(fullname, [],[starts(ii) ends(ii)]);
+    mt = MouseTrackerObj(fullname, [],[starts(ii) ends(ii)]);
 %    mt.plotFollowing([], following_thresh, 0);
     rew_prop(ii) = mt.propTimeOnTrail([],1,following_thresh);
     dist_prop(ii) = mt.propTimeOnTrail([],2,following_thresh);

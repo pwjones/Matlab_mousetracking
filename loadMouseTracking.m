@@ -7,7 +7,7 @@ function ret = loadMouseTracking(list_file, file_range, following_thresh)
 
 base_fname = '/Users/pwjones/Movies/mouse_training/';
 %following_thresh = 20; %px, the distance from the trail the animal can get before it's counted as not following
-
+class_func = @MouseTrackerKF;
 %%%%%%%%%%%%%%%% Start in on doing things  %%%%%%%%%%%%%%%%
 fid = fopen(list_file, 'r');
 res = textscan(fid, '%s [%d %d]');
@@ -41,7 +41,7 @@ total_turning = NaN*zeros(nfiles,1);
 for ii = 1:nfiles
     fullname = fullfile(base_fname, fnames{ii});
     
-    mt = MouseTrackerUnder2(fullname, [],[starts(ii) ends(ii)]);
+    mt = class_func(fullname, [],[starts(ii) ends(ii)]);
 %    mt.plotFollowing([], following_thresh, 0);
     rew_prop(ii) = mt.propTimeOnTrail([],1,following_thresh);
     dist_prop(ii) = mt.propTimeOnTrail([],2,following_thresh);

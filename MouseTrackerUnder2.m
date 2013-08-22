@@ -221,7 +221,7 @@ classdef MouseTrackerUnder2 < handle
             %cm = colormap(spring(this.nFrames));
             vel_vect = this.vel(frames);
             [cm cinds] = getIndexedColors('jet', vel_vect, 1);
-            cm = brighten(cm, .5);
+            %cm = brighten(cm, .5);
             % unfortunately, I haven't been able to figure out an easier way to do colormapping of points plotted over
             % a B&W image, without the points and the image sharing the same colormap.  So, here I'm just plotting every
             % point separately, with a color indicative of the velocity of the animal.

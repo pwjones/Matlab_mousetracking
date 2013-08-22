@@ -231,9 +231,9 @@ classdef MouseTrackerKF < handle
             xlim([0 this.width]); %fit the axes to the image
             ylim([0 this.height]);
             %cm = colormap(spring(this.nFrames));
-            vel_vect = this.vel(frames);
+            vel_vect = this.vel(frames,1);
             [cm cinds] = getIndexedColors('jet', vel_vect, 1);
-            cm = brighten(cm, .5);
+            %cm = brighten(cm, .5);
             % unfortunately, I haven't been able to figure out an easier way to do colormapping of points plotted over
             % a B&W image, without the points and the image sharing the same colormap.  So, here I'm just plotting every
             % point separately, with a color indicative of the velocity of the animal.
@@ -627,7 +627,7 @@ classdef MouseTrackerKF < handle
                        
                         this.detectTail(fi); 
                         this.bodyCOM(fi,:) = this.computeBodyPos(fi,1); % 1) get the center of mass of animal
-                        this.nosePos(fi,:) = this.findNose(fi); % 2) get the nose blob
+                        [this.nosePos(fi,:), this.noseblob(fi)] = this.findNose(fi); % 2) get the nose blob
                         s = this.kf.s(fi); % 3) compare to prediction
                         pred_x = s.x(1:2)';
                         if( fi == 1) %if first frame, make sure that things are good
@@ -744,14 +744,17 @@ classdef MouseTrackerKF < handle
                     overlap = regionOverlap(prev_tail, regions, this.regprops);
                     [maxo, maxoi] = max(overlap);
                 end
-                if maxo > .9 %if really similar, we've found another tail
+                if maxo > .1 %if similar, we've found another tail - this is a conservative threshold. Comparing the 
+                    % overlap of id'd tail blobs to non-tail blobs, they are all down below
+                    % .05...essentially zero.  This is really conservative - assuming that you get the
+                    % tail in the first place.
                     this.tailVisible(fi) = 1;
                     this.tailblob(fi) = maxoi;
                 else
                     % going to find the blob with the highest eccentricity to be the tail
                     ecc = [regions.MajorAxisLength]./[regions.MinorAxisLength];
                     [max_ecc, maxi] = nanmax(ecc);
-                    if max_ecc>4 && regions(maxi).Area > 100%this is just an empirically defined threshold value
+                    if max_ecc>4.5 && regions(maxi).Area > 100%this is just an empirically defined threshold value
                         this.tailVisible(fi) = 1;
                         this.tailblob(fi) = maxi;
                     else
@@ -762,15 +765,29 @@ classdef MouseTrackerKF < handle
             end
         end
         % ------------------------------------------------------------------------------------------------------
-        function nosep = findNose(this, frames)
+        function [nosep, noseblob] = findNose(this, frames)
         % function nosep = findNose(this, frames, blobi)
         %
         % So, the method for finding which blob is the nose is to take the tail and body center and take the 
         % distance along that vector for every blob centroid. The one with the largest is the nose.
-            nosep = NaN* zeros(length(frames), 2);
+            %nosep = NaN* zeros(length(frames), 2);
+            nosep = this.nosePos(frames,:);
+            noseblob = this.noseblob(frames);
             for ii = 1:length(frames)
                 fi = frames(ii);
-                if (this.nblobs(fi) > 3) %only works if there are enough things to track
+                regions = this.areas(fi,:);
+                maxo = 0;
+                if fi >1 && ~isnan(this.noseblob(fi-1)) %finding similarity with previously id'd tail 
+                    if (ii == 1) prev_nb = this.noseblob(fi-1);
+                    else prev_nb = noseblob(ii-1);
+                    end
+                    prev_nose = this.areas(fi-1,prev_nb);
+                    overlap = regionOverlap(prev_nose, regions, this.regprops);
+                    [maxo, maxoi] = max(overlap);
+                end
+                if maxo > .7 %nearly all non-nose blobs have zero overlap with a well defined nose
+                    noseblob(ii) = maxoi;
+                elseif (this.nblobs(fi) > 3) %only works if there are enough things to track
                     if this.tailVisible(fi) && (this.nblobs(fi) > 2)%we can only do this first method if the tail is present
                         % compute the vector from tail to body center
                         bodyVect = this.bodyCOM(fi,:) - this.areas(fi,this.tailblob(fi)).Centroid;
@@ -780,15 +797,20 @@ classdef MouseTrackerKF < handle
                             dist(jj) = dot(areaVect, bodyVect);
                         end
                         [maxd, maxi] = max(dist); %the maximum distance and ind along tail-body vector of each blob  
-                        this.noseblob(fi) = maxi; 
-                        nosep(ii,:) = this.areas(fi,this.noseblob(fi)).Centroid; % The nose is the farthest along vector
+                        noseblob(ii) = maxi; 
+                        nosep(ii,:) = this.areas(fi,noseblob(ii)).Centroid; % The nose is the farthest along vector
                     end
                 end
             end
-            % putting in a maximum distance criterion of 500 px away from last frame 
+            % putting in a maximum distance criterion of 50 px away from last frame 
+            
+            %let's trim the vectors
+            %nosep = nosep(frames,:);
+            %noseblob = noseblob(frames);
+            
             dists = diff(nosep,1,1);
             dists = sqrt(sum(dists.^2,2));
-            toofar = dists > 100;
+            toofar = dists > 50;
             nosep(toofar,:) = NaN*zeros(sum(toofar), 2);
         end
         
@@ -866,10 +888,11 @@ classdef MouseTrackerKF < handle
             else
                 fr = [1; frames(:)];
             end
-            pos = this.bodyCOM(fr,:);
+            %pos = this.bodyCOM(fr,:);
+            pos = this.nosePos(fr,:);
             diff_pos = diff(pos, 1,1);%differences in each x,y position
             vel = sqrt(sum(diff_pos.^2, 2));
-            this.vel(fr(2:end)) = vel; % vel is 1 shorter than the fr
+            this.vel(fr(2:end),1) = vel; % vel is 1 shorter than the fr
             this.direction = cart2pol(diff_pos(:,1), diff_pos(:,2)); %this is the direction of motion
             
             %diff_com = [COM(1,:); diff_com]; % add the first position to get an equal sized vector
@@ -1114,7 +1137,7 @@ classdef MouseTrackerKF < handle
          % This is a function that initializes or reintializes the computed data
             this.COM = NaN*zeros(this.nFrames, 2, this.maxBlobs);
             this.orient = NaN*zeros(this.nFrames, this.maxBlobs);
-            this.vel = NaN*zeros(this.nFrames, this.maxBlobs);
+            this.vel = NaN*zeros(this.nFrames, 1);
             this.direction = NaN*zeros(this.nFrames, this.maxBlobs);
             this.tailVisible = zeros(this.nFrames, 1);
             this.nosePos = NaN*zeros(this.nFrames, 2); %nose position
@@ -1688,7 +1711,7 @@ classdef MouseTrackerKF < handle
             new_mov = rawArray(:,:,frame_range);
             %detection settings
             %thresh(1) = .1; % the threshold level
-            p_mouse = .0007; 
+            p_mouse = .0008; 
             erode_size = 3; %the size of erosion mask
             % boostContrast = 1;
             % make a movie from the average frame to subtract
