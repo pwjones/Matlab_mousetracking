@@ -38,6 +38,7 @@ classdef MouseTrackerKF < handle
         boostContrast = 1; %video processing option, boolean switch to boost contrast of the movie on each frame
         default_thresh = 0;
         used_thresh = 0;
+        p_mouse = .0008; %the proportion of pixels that are 
         % The list of properties detected in the binary image of each frame
         regprops = {'Area', 'Centroid', 'BoundingBox','MajorAxisLength','MinorAxisLength','Orientation','Extrema','PixelIdxList','PixelList','Perimeter'};
         blobsToDelete = []; %list for debugging purposes of those blobs to delete - to mark them.
@@ -568,6 +569,30 @@ classdef MouseTrackerKF < handle
             % returns the frames of the movie specified, binary or greyscale
             mov = this.readMovieSection(frames, movieType);
             
+        end
+        
+        % Setting functions for manually altering the tracking result
+        function setTailPosition(this, frame, pos)
+            frame = frame(1);
+            centers = [this.areas(frame, :).Centroid];
+            centers = reshape(centers, 2, [])';
+            dist = ipdm(centers, pos);
+            if nanmin(dist) < 10
+                [min_dist, disti] = nanmin(dist);
+                this.tailblob(frame) = disti;
+            end
+        end
+        
+        function setNosePosition(this, frame, pos)
+            frame = frame(1);
+            centers = [this.areas(frame, :).Centroid];
+            centers = reshape(centers, 2, [])';
+            dist = ipdm(centers, pos);
+            if nanmin(dist) < 10
+                [min_dist, disti] = nanmin(dist);
+                this.noseblob(frame) = disti;
+                this.nosePos(frame,:) = this.areas(frame,disti).Centroid;
+            end
         end
         
     %end
@@ -1556,6 +1581,17 @@ classdef MouseTrackerKF < handle
             turning_vect = turning_vect(frames-1);
             turning_total = nansum(turning_vect);
         end
+        
+        % ------------------------------------------------------------------------------------------------------
+        function nose_jumps = findNoseJumps(this, dist_thresh, frames)
+            % reports the first frame after there is a large jump in the nose position
+            if isempty(frames)
+                frames = 1:this.nFrames;
+            end
+            dists = sqrt(sum(diff(this.nosePos(frames,:)).^2, 2));
+            nose_jumps = find(dists >= dist_thresh);
+        end
+            
         % ------------------------------------------------------------------------------------------------------
         function showFrame(this, framei, movieType, dispCrop)
             % function showFrame(this, framei, useBinMovie)
@@ -1695,6 +1731,14 @@ classdef MouseTrackerKF < handle
             fakePath.PixelList = PixelList;
         end
         
+        % ---------------------------------------------------
+        function rethreshold(this, frameRange)
+        % Setting the threshold differently in order to improve blob identification
+            for ii = 1:length(frameRange)
+                
+            end
+            
+        end
         % ---------------------------------------------------------------------------
         function [ret_mov, avg_frame, thresh] = processFrameArray(this, rawArray, frame_range, subFrame, movieType, varargin)
             % returns a  movie using the frames specified in the input. The movie can appear different and
