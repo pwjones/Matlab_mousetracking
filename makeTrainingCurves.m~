@@ -19,7 +19,7 @@ vid_list = '9085_50_files_2.txt';
 %hist_trial_range = [87:100; 101:114];
 %hist_trail_range = [41:67; 68:94];
 %hist_trial_range = [62:100; 101:139];
-hist_trial_range = [1:10; 36:45];
+hist_trial_range = [1:10; 35:45];
 
 
 %%%%%%%%%%%%%%%% Start in on doing things  %%%%%%%%%%%%%%%%

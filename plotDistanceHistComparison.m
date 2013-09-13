@@ -24,7 +24,7 @@ for ii = 1:2
         rdists = r_trials{jj};
         inci = (abs(rdists) <= dist_thresh) & ~isnan(rdists) & (abs(rdists) >= min_dist);
         rdists = rdists(inci);
-        distance_comp{ii,1} = cat(1, distance_comp{ii,1}, rdists);
+        distance_comp{ii,1} = cat(1, distance_comp{ii,1}, rdists(:));
     end
     % distractor path
     trials = nfiles(ii,2);
@@ -33,7 +33,7 @@ for ii = 1:2
         ddists = d_trials{jj};
         inci = (abs(ddists) <= dist_thresh) & ~isnan(ddists) & (abs(ddists) >= min_dist);
         ddists = ddists(inci);
-        distance_comp{ii,2} = cat(1, distance_comp{ii,2}, ddists);
+        distance_comp{ii,2} = cat(1, distance_comp{ii,2}, ddists(:));
     end
 end
     

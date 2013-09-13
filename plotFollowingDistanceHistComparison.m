@@ -17,7 +17,7 @@ for ii = 1:2
         rdists = r_trials{jj};
         inci = rdists ~= 0;
         rdists = rdists(inci);
-        distance_comp{ii,1} = cat(1, distance_comp{ii,1}, rdists);
+        distance_comp{ii,1} = cat(1, distance_comp{ii,1}, rdists(:));
     end
     % distractor path
     trials = nfiles(ii,2);
@@ -26,7 +26,7 @@ for ii = 1:2
         ddists = d_trials{jj};
         inci = ddists ~= 0; 
         ddists = ddists(inci);
-        distance_comp{ii,2} = cat(1, distance_comp{ii,2}, ddists);
+        distance_comp{ii,2} = cat(1, distance_comp{ii,2}, ddists(:));
     end
 end
     
@@ -76,7 +76,10 @@ xlabel('Following Distance (px)', 'FontSize', 14);
 ylabel('# Instances','FontSize', 14);
 set(gca, 'TickDir', 'out');
 
-plotEmpiricalCDF(distance_comp, 1, {[0 1 0],[0 1 0], [1 0 0], [1 0 0]}, {'-','--', '-','--'});
-
+plotEmpiricalCDF(distance_comp, 1, {[0 1 0],[0 1 0], [1 0 0], [1 0 0]}, {'-','--','-','--'});
+title('CDF of Following Distances');
+xlabel('Following Distance (px)', 'FontSize', 14);
+ylabel('Prop of Instances','FontSize', 14);
+set(gca, 'TickDir', 'out');
 
 

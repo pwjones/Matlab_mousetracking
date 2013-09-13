@@ -22,7 +22,7 @@ function varargout = reviewTracking(varargin)
 
 % Edit the above text to modify the response to help reviewTracking
 
-% Last Modified by GUIDE v2.5 23-Aug-2013 18:30:16
+% Last Modified by GUIDE v2.5 28-Aug-2013 13:26:47
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -78,6 +78,9 @@ handles.anatomyFlag = 1;
 handles = changeFrame(hObject, handles, handles.currFrame);
 set(hObject, 'Toolbar', 'figure');
 set(hObject, 'KeyPressFcn', @(hObject, evt)keyResponder(hObject, evt));
+% The propogation section
+handles.corrThresh = .6;
+
 
 guidata(hObject, handles); % Update handles structure
 % UIWAIT makes reviewTracking wait for user response (see UIRESUME)
@@ -295,3 +298,33 @@ function find_jumps_btn_Callback(hObject, eventdata, handles)
 % hObject    handle to find_jumps_btn (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
+
+
+% --- Executes on button press in propogate_btn.
+function propogate_btn_Callback(hObject, eventdata, handles)
+% hObject    handle to propogate_btn (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+
+
+function prop_thresh_edit_Callback(hObject, eventdata, handles)
+% hObject    handle to prop_thresh_edit (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of prop_thresh_edit as text
+%        str2double(get(hObject,'String')) returns contents of prop_thresh_edit as a double
+
+
+% --- Executes during object creation, after setting all properties.
+function prop_thresh_edit_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to prop_thresh_edit (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
