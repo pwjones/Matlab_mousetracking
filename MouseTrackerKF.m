@@ -1,51 +1,9 @@
 classdef MouseTrackerKF < MouseTracker
     properties
-        MOUSE_SCALE = 10; % minimal size of the mouse used to exclude smaller objects - radius of mask
-        MIN_SIZE_THRESH = 20; %minimal size of a binary area in pixels
-        MAX_SIZE_THRESH = 1200;
-        videoFN = []; % filename of the video
-        readerObj; %videoReader object 
-        framesPerSeg = 200 %the # of frames read at one time
-        avgSubsample = 60 %sample every X frames to make the average
-        width % movie dimensions
-        nativeWidth
-        height
-        nativeHeight
-        crop % number of pixels trimmed from each side of movie
-        frameRate %fps
-        totalDuration %total length of the movie, sec
-        nFrames
-        trustFrameCount %mmread sometimes fails to exactly get the number of frames
-        frameRange % frame numbers loaded in reference to original file
-        avgFrame % the time averaged frame
-        maxBlobs = 10 % number of mouse sections tracked
-        nblobs %numer of sections found in each frame
-        tailblob %the index of the tail blob for each frame
-        noseblob %the index of the nose blob for each frame
-        COM % center of mass for each blob
-        bodyCOM %center of mass of all blobs combined
-        bodyOrient %the orientation of the entire body (minus tail), in radians 0-360
-        orient % orientation of each blob
-        vel % velocity of each blob
-        bodyVel
-        noseVel
-        direction %movement direction, blob-wise
-        nosePos %the tip of the nose
-        times % frame times
-        areas % mouse regions
-        tailVisible % boolean
-        paths %binary areas for the detected paths
-        boostContrast = 1; %video processing option, boolean switch to boost contrast of the movie on each frame
         default_thresh = 0;
         used_thresh = 0;
         p_mouse = .0008; %the proportion of pixels that are 
-        % The list of properties detected in the binary image of each frame
-        regprops = {'Area', 'Centroid', 'BoundingBox','MajorAxisLength','MinorAxisLength','Orientation','Extrema','PixelIdxList','PixelList','Perimeter'};
-        blobsToDelete = []; %list for debugging purposes of those blobs to delete - to mark them.
         kf = struct('nstates', {}, 'nob', {}, 's', {});
-    end
-    properties (SetAccess = private)
-        exitMovie = 0
     end
     
     methods
@@ -64,98 +22,11 @@ classdef MouseTrackerKF < MouseTracker
             
             % This is all to just make sure that the file is opened correctly, and that it will take a filename,
             % directory or nothing.
-            movie_folder = ''; filename = '';
-            if (nargin > 0)
-                filename = varargin{1};
-                if exist(filename, 'dir') % a folder was specified
-                    movie_folder = filename;
-                    filename = '';
-                elseif exist(filename, 'file') % a valid filename is specified
-                    this.videoFN = filename;
-                end
-            end
-            if isempty(filename) || ~exist(filename) %a non-complete path was specified, and needs to be chosen
-                movie_folder = '~pwjones/Movies/mouse_training/';
-                [filename, movie_folder] = uigetfile([movie_folder '*.*']);
-                if filename == 0 % the user has canceled the file selection
-                    return;
-                end
-                this.videoFN = [movie_folder filename];
-            else
-                this.videoFN = filename;
-            end
-            [base_dir, base_fn, ext] =  fileparts(this.videoFN);
-            mat_fn = fullfile(base_dir, [base_fn '.mat']);
-            if exist(mat_fn, 'file')
-                % then load the saved file
-                disp(['Loading the saved object for: ' mat_fn]);
-                arg_vidFN = this.videoFN;
-                try
-                    load(mat_fn)
-                catch ME
-                    disp(['Error loading: ' mat_fn]);
-                end
-                if exist(this.videoFN, 'file')
-                    this.findMovieFile(this.videoFN);
-                elseif (exist(arg_vidFN)) %if files are moved, resolve
-                    this.findMovieFile(arg_vidFN);
-                else
-                    error('There is no valid movie file specified. Cannot load object');
-                end
-                this.videoFN = arg_vidFN; %for some reason, in no case does the full video filename gets saved
-            else %initialize normally 
-                % Read just a couple of frames to get an idea of video speeds, etc.
-                this.readerObj = VideoReader(this.videoFN);
-               
-                this.frameRate = this.readerObj.FrameRate;
-                this.nativeWidth = this.readerObj.Width;
-                this.nativeHeight = this.readerObj.Height;
-
-                if (nargin > 3) %there is a crop vector present
-                    this.crop = varargin{4};
-                    this.width = this.readerObj.width - sum(this.crop(1:2));
-                    this.height = this.readerObj.height - sum(this.crop(3:4));
-                else
-                    this.crop = [ 0 0 0 0];
-                    this.width = this.nativeWidth;
-                    this.height = this.nativeHeight;
-                end
-
-                % figure out the range of frames to be considered
-                time_range = []; this.frameRange = [];
-                if (nargin > 2) %use the time range specified
-                    time_range = varargin{3};
-                    t_offset = time_range(1);
-                    fr = round((time_range)*this.frameRate + 1);
-                    if (fr(2) > this.readerObj.NumberOfFrames)
-                        fr(2) = this.readerObj.NumberOfFrames;
-                    end
-                    this.frameRange = fr(1):fr(2);
-                elseif nargin == 2
-                    this.frameRange = varargin{2};
-                end
-                if isempty(this.frameRange) % then specify the whole video's range
-                    this.frameRange = 1:this.readerObj.NumberOfFrames; %undershoot to avoid potential problems
-                    this.trustFrameCount = 1;
-                end
-                % read in enough frames to create the average frame
-                %avgRange = this.frameRange(1):this.avgSubsample:this.frameRange(end);
-                disp('MouseTracker: reading movie to make average frame');
-                avgRange = 1:this.avgSubsample:length(this.frameRange);
-                while (length(avgRange) < 20)
-                    this.avgSubsample = floor(this.avgSubsample/2);
-                    avgRange = 1:this.avgSubsample:length(this.frameRange);
-                end
-                vidArray = this.readFrames(this.listToIntervals(avgRange), 'discontinuous');
-                this.avgFrame = uint8(mean(vidArray, 3));
-
-                % Populate the fields with empty data
-                this.nFrames = length(this.frameRange);
-                this.times = ((1:this.nFrames)-1)/this.frameRate; % time vector starts at 0
-                %initialize areas
-                this.clearCalcData();
-            end
-        end %function MouseTracker
+            
+            % All of the proper initialization is done in the MouseTracker object this is inherited from
+            this = this@MouseTracker(varargin{:});
+%            
+        end %function MouseTrackerKF
         % ------------------------------------------------------------------------------------------------------
         function initKalmanFilter(this)
         % function initKalmanFilter(this)
@@ -299,8 +170,8 @@ classdef MouseTrackerKF < MouseTracker
             for ii=1:length(frames)
                 fi = frames(ii);
                 if ~isnan(this.noseblob(fi))
-                    line('Parent', ah, 'Xdata', this.nosePos(fi,1,1), 'Ydata', this.nosePos(fi,2,1), ...
-                        'Marker', '.', 'MarkerSize', 6, 'Color', c);
+                    line('Parent', ah, 'Xdata', this.nosePos(fi,1), 'Ydata', this.nosePos(fi,2), ...
+                        'Marker', '.', 'MarkerSize', 8, 'Color', c);
                 end
             end 
         end
@@ -341,8 +212,10 @@ classdef MouseTrackerKF < MouseTracker
             for ii=1:length(frames)
                 fi = frames(ii);
                 if ~isnan(this.noseblob(fi))
-                    line('Parent', ah, 'Xdata', this.areas(fi,this.noseblob(fi)).Centroid(1), 'Ydata', ...
-                        this.areas(fi,this.noseblob(fi)).Centroid(2), 'Marker', '.', 'MarkerSize', 8, 'Color', plotblue);
+                    %line('Parent', ah, 'Xdata', this.areas(fi,this.noseblob(fi)).Centroid(1), 'Ydata', ...
+                    %    this.areas(fi,this.noseblob(fi)).Centroid(2), 'Marker', '.', 'MarkerSize', 8, 'Color', plotblue);
+                    line('Parent', ah, 'Xdata', this.nosePos(fi,1), 'Ydata', ...
+                        this.nosePos(fi,2), 'Marker', '.', 'MarkerSize', 8, 'Color', plotblue);
                 end
             end 
             title(this.videoFN);
@@ -1546,8 +1419,8 @@ classdef MouseTrackerKF < MouseTracker
             trackJumps = diff(trackingInds); %identify contiguous and non are 
             skips = find(trackJumps > 1); % noncontiguous
             if ~isempty(trackingInds)
-                seq_end = trackingInds(skips); %these are the indices of segments of following
-                seq_start = [trackingInds(1) trackingInds(skips(1:end-1)+1)']';
+                seq_end = [trackingInds(skips)' trackingInds(end)]'; %these are the indices of segments of following
+                seq_start = [trackingInds(1) trackingInds(skips+1)']';
                 frame_start = nnframes(seq_start); %now get the actual frame numbers
                 frame_end = nnframes(seq_end);
                 if (isempty(frame_end)) frame_end = nnframes(trackingInds(end)); end
@@ -1584,6 +1457,27 @@ classdef MouseTrackerKF < MouseTracker
         frameNums_ret = frameNums;
         end
         
+        % ------------------------------------------------------------------------------------------------------
+        function prop = propTrailFollowed(this, frames, trailNum, threshDist)
+        % function propTrailFollowed(this, frames, trailNum, threshDist)
+        %
+        % This function returns the proporation of the trail pixels that the mouse came within a given
+        % distance of.  Seems like a clean way of measuring the completeness of his trail exploration.
+        % Algorthmically, this is a similar problem to finding the following segments except reversed.
+        if isempty(frames)
+            frames = 1:this.nFrames;
+        end
+        np = this.nosePos(frames,:);
+        nn = ~isnan(np(:,1));
+        np = np(nn,:);
+        trailPos = this.paths(trailNum).PixelList; 
+        distm = ipdm(single(np), single(trailPos));
+        [trailDist, mini] = nanmin(distm, [], 1);
+        explored = find(trailDist <= threshDist);
+        npx = length(this.paths(trailNum).PixelIdxList);
+        prop = length(explored)/npx;
+        
+        end
         % ------------------------------------------------------------------------------------------------------
         function turning_total = totalTurning(this, frames)
             measure_name = 'direction';

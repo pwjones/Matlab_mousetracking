@@ -94,7 +94,7 @@ switch evt.Key
     case 'rightarrow'
         handles = changeFrame(hObject, handles, cf + 1);
     case 'leftarrow'
-        handles = changeFrame(hObject, handles, cf + 1);
+        handles = changeFrame(hObject, handles, cf - 1);
     case 'downarrow'
         nf = find(handles.jumpFrames > cf, 1, 'first');
         if isempty(nf)

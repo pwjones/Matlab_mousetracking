@@ -39,9 +39,10 @@ classdef MouseTracker < handle
         % The list of properties detected in the binary image of each frame
         regprops = {'Area', 'Centroid', 'BoundingBox','MajorAxisLength','MinorAxisLength','Orientation','Extrema','PixelIdxList','PixelList','Perimeter'};
         blobsToDelete = []; %list for debugging purposes of those blobs to delete - to mark them.
+        exitMovie = 0
     end
     properties (SetAccess = private)
-        exitMovie = 0
+        
     end
     
     methods

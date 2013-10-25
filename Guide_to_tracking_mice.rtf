@@ -1,0 +1,31 @@
+{\rtf1\ansi\ansicpg1252\cocoartf1138\cocoasubrtf510
+{\fonttbl\f0\fswiss\fcharset0 Helvetica;}
+{\colortbl;\red255\green255\blue255;}
+\margl1440\margr1440\vieww19380\viewh13200\viewkind0
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
+
+\f0\b\fs24 \cf0 General Procedure for mouse tracking in video files
+\b0  \
+\
+Start with all of the video in a single folder.\
+\
+Make a text file using 
+\b genMovieList
+\b0  - outputs text to the workspace that you then can just copy to a text file in the folder.\
+\
+Call that text file 'tracking_times.txt' and save it in the folder with the videos\
+\
+Review the movies and put start and end times for mouse tracking in each movie.  These should be when the mouse, and nothing else\
+moving, is fully in the frame (including tail) and should end at the end of the video.  These should be in seconds and should be bracketed like [5 40] for\
+ reading from 5 to 40 seconds of the movie.  \
+\
+If only videos, call 
+\b processVideoFolder.m
+\b0  with the folder name and whatever else it wants, with a call like \
+
+\b vids=ProcessVideoFolder('130822', @MouseTrackerKF);\
+
+\b0 This would process the folder '130822' (relative path) using the MouseTrackerKF object (the @ syntax means that MouseTrackerKF is a function handle).  \
+It saves the results as mat files in the same folder.\
+\
+You now have to detect the trails in the files.  More to come...}

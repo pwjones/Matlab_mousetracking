@@ -90,6 +90,7 @@ ylabel('% Time on Trail','FontSize', 18);
 legend({'Sham Trail','Rewarded Trail', 'Distracter Trail'});
 title('Proportion of Time Following Trails');
 
+% Proportion of following time on rewarded trail
 figure; 
 plot(rew_prop./(dist_prop+rew_prop), 'k', 'LineWidth',2);
 title('Rewarded Following / Total Following');

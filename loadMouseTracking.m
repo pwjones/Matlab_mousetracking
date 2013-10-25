@@ -1,25 +1,30 @@
-function ret = loadMouseTracking(list_file, file_range, following_thresh)
+function ret = loadMouseTracking(files, file_range, following_thresh)
 % function loadMouseTracking(list_file, file_range)
 % 
 % Function to load a set of processed videos, their saved MouseTracker
-% objects. The set is defined in the LIST_FILE, of which subsets can be
-% selected using the FILE_RANGE argument. 
+% objects. For flexibility, FILES can either be a filename or a cell array of strings 
+% with individual movie fileanmes. Subsets can be selected using the FILE_RANGE argument. 
 
 base_fname = '/Users/pwjones/Movies/mouse_training/';
 %following_thresh = 20; %px, the distance from the trail the animal can get before it's counted as not following
 class_func = @MouseTrackerKF;
 %%%%%%%%%%%%%%%% Start in on doing things  %%%%%%%%%%%%%%%%
-fid = fopen(list_file, 'r');
-res = textscan(fid, '%s [%d %d]');
-fnames = res{1};
-starts = res{2};
-ends = res{3};
+if ~iscell(files)
+    fid = fopen(files, 'r');
+    res = textscan(fid, '%s [%d %d]');
+    fnames = res{1};
+    starts = res{2};
+    ends = res{3};
+    fclose(fid);
+else
+    fnames = files;
+end
 
 %select the subset of files that are desired
 if isempty(file_range) file_range = 1:length(fnames); end
 fnames = fnames(file_range);
-starts = starts(file_range);
-ends = ends(file_range);
+%starts = starts(file_range);
+%ends = ends(file_range);
 
 % Video properties
 %vid = struct('fname', '20121209/9085_2012-12-09-165014-0000.avi', 'timeRange', [5 250]);
@@ -36,12 +41,25 @@ distract_dists_from_trail_persect = cell(nfiles,1);
 total_frames = NaN*zeros(nfiles,1);
 frame_rate = NaN*zeros(nfiles,1);
 total_turning = NaN*zeros(nfiles,1);
-
-
+rew_trail_area = NaN*zeros(nfiles,1);
+dist_trail_area = NaN*zeros(nfiles,1);
+rew_propFollowed = NaN*zeros(nfiles,1);
+dist_propFollowed = NaN*zeros(nfiles,1);
+dir_nums = NaN*zeros(nfiles,1);
+prev_dir_name = ''; curr_dir_num = 0;
 for ii = 1:nfiles
     fullname = fullfile(base_fname, fnames{ii});
-    
-    mt = class_func(fullname, [],[starts(ii) ends(ii)]);
+    % want to number the days in case we plot performance over days
+    dir_name = strtok(fnames{ii}, '/');
+    if ~strcmp(dir_name, prev_dir_name);
+        curr_dir_num = curr_dir_num + 1;
+    end
+    prev_dir_name = dir_name;
+    dir_nums(ii) = curr_dir_num;
+    % so this assumes that the object already exists, the video is already processed,
+    % and that we are calling the constructor function to load it. 
+    %mt = class_func(fullname, [],[starts(ii) ends(ii)]); 
+    mt = class_func(fullname, [],[]); 
 %    mt.plotFollowing([], following_thresh, 0);
     rew_prop(ii) = mt.propTimeOnTrail([],1,following_thresh);
     dist_prop(ii) = mt.propTimeOnTrail([],2,following_thresh);
@@ -55,6 +73,10 @@ for ii = 1:nfiles
     % now collect a few factors about each of the movies
     total_frames(ii) = mt.nFrames;
     frame_rate(ii) = mt.frameRate;
+    rew_trail_area(ii) = mt.paths(1).Area;
+    dist_trail_area(ii) = mt.paths(2).Area;
+    rew_propFollowed(ii) = mt.propTrailFollowed([], 1, 15);
+    dist_propFollowed(ii) = mt.propTrailFollowed([],2,15);
 end
 
 % Results
@@ -69,3 +91,8 @@ ret.distract_dists_from_trail = distract_dists_from_trail;
 ret.total_turning = total_turning;
 ret.rew_dists_from_trail_persect = rew_dists_from_trail_persect;
 ret.distract_dists_from_trail_persect = distract_dists_from_trail_persect;
+ret.rew_trail_area = rew_trail_area;
+ret.dist_trail_area = dist_trail_area;
+ret.rew_propFollowed = rew_propFollowed;
+ret.dist_propFollowed = dist_propFollowed;
+ret.dir_nums = dir_nums;

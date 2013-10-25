@@ -3,12 +3,15 @@ function plotDistanceHistComparison(rew_cell, dist_cell, rew_cell2, dist_cell2, 
 %
 % Function will plot histograms of the frame by frame distance from the
 % path for 
-min_dist = .5; %.75;
+min_dist = 0; %.75;
 
 if ~isempty(varargin)
     cdf_ah = varargin{1};
 else
     figure; cdf_ah = axes; hold on;
+end
+if isempty(plotOptions)
+   plotOptions = {'-','-','--','--'}; 
 end
 
 nfiles = [length(rew_cell), length(dist_cell); length(rew_cell2), length(dist_cell2)];
@@ -88,7 +91,7 @@ ylabel('# Instances','FontSize', 14);
 set(gca, 'TickDir', 'out');
 
 % Plot the CDFs
-plotEmpiricalCDF(distance_comp, .2, {[0 1 0],[0 1 0], [1 0 0], [1 0 0]}, plotOptions, cdf_ah);
+plotEmpiricalCDF(distance_comp, .2, {[0 0 0],[1 0 1], [1 0 0], [1 0 0]}, plotOptions, cdf_ah);
 set(get(cdf_ah,'XLabel'), 'String', 'Nose distance From Trail (px)', 'FontSize', 18);
 set(get(cdf_ah,'Ylabel'), 'String', 'Cumulative Proporation of Frames', 'FontSize', 18);
 set(cdf_ah, 'Tickdir', 'out', 'FontSize', 14);
