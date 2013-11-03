@@ -5,7 +5,7 @@ classdef MouseTracker < handle
         MAX_SIZE_THRESH = 1200;
         videoFN = []; % filename of the video
         readerObj; %videoReader object 
-        framesPerSeg = 200 %the # of frames read at one time
+        framesPerSeg = 150 %the # of frames read at one time
         avgSubsample = 60 %sample every X frames to make the average
         width % movie dimensions
         nativeWidth

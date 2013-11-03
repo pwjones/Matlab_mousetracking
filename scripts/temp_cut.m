@@ -2,9 +2,10 @@
 
 % We need to define the trials for which the mice are occluded. Since they are occluded in different
 % orders this needs to be specified on a per mouse basis.
-occr_trials = {73:103, 77:107, 74:111, 75:104, 26:35, 26:36, 26:35, 26:35}; %each cell is a mouse
-ctl_trials = {42:72, 46:76, 43:73, 44:74, 26:45, 26:45, 26:45, 26:45};
+occr_trials = {68:99, 65:77, 26:35, 26:35, 26:35, 26:36, 26:35, 26:35}; %each cell is a mouse
+ctl_trials = {39:67, 40:65, 26:45, 26:45, 26:45, 26:45, 26:45, 26:45};
 occl_trials = {16:25, 16:25, 16:25, 16:25, 16:25, 16:25, 16:25, 16:25};
+%ctl2_trails = {100:103, 
 nMice = length(perMouseData);
 fh = figure; hold on;
 for ii = 1:nMice

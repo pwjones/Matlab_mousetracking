@@ -170,8 +170,9 @@ classdef MouseTrackerKF < MouseTracker
             for ii=1:length(frames)
                 fi = frames(ii);
                 if ~isnan(this.noseblob(fi))
+                    % So, this way we can't plot a solid line.
                     line('Parent', ah, 'Xdata', this.nosePos(fi,1), 'Ydata', this.nosePos(fi,2), ...
-                        'Marker', '.', 'MarkerSize', 8, 'Color', c);
+                        'Marker', '.','MarkerSize', 8, 'Color', c);
                 end
             end 
         end
@@ -1661,7 +1662,7 @@ classdef MouseTrackerKF < MouseTracker
             new_mov = rawArray(:,:,frame_range);
             %detection settings
             %thresh(1) = .1; % the threshold level
-            p_mouse = .0008; 
+            p_mouse = .0007; 
             erode_size = 3; %the size of erosion mask
             % boostContrast = 1;
             % make a movie from the average frame to subtract

@@ -41,7 +41,7 @@ for ii = 1:2
 end
     
 counts = cell(2,2); %want to do a reward/distractor, early/late comparison
-xbins = -dist_thresh:.5:dist_thresh;
+xbins = -dist_thresh:dist_thresh;
 [counts{1,1}] = hist(distance_comp{1,1}, xbins); counts{1,2} = hist(distance_comp{1,2},xbins);
 counts{2,1} = hist(distance_comp{2,1},xbins); counts{2,2} = hist(distance_comp{2,2}, xbins);
 
@@ -64,15 +64,12 @@ line([xmed xmed], [0 -yl(2)], 'Color', dg, 'LineStyle', '--');
 text(xmed, -yl(2)-10, ['median: ' num2str(xmed)], 'color', dg);
 
 % KS test the distributions
-[h,p,ks2stat] = kstest2(distance_comp{1,1}, distance_comp{2,1}, .05);
+[h,p,ks2stat] = kstest2(counts{1,1}, counts{2,1}, .05);
 if h sig = ''; else sig = 'NOT'; end
-sig_str = sprintf('KS Test: Rewarded conditions are %s significantly different: h=%i p=%f', sig, h, p);
+sig_str = sprintf('Rewarded conditions are %s significantly different: h=%i p=%f', sig, h, p);
 disp(sig_str);
 % Also, let's throw a ranked sum test at it to test if the medians of the distributions are different
-[h,p] = ranksum(distance_comp{1,1}, distance_comp{2,1}, .05);
-if h sig = ''; else sig = 'NOT'; end
-sig_str = sprintf('Wilcoxon: Rewarded conditions are %s significantly different: h=%i p=%f', sig, h, p);
-disp(sig_str);
+
 
 % Non rewarded path
 yl = max([counts{1,2} counts{2,2}]);  yl = [-(yl+5) yl+5];
