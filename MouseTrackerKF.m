@@ -207,6 +207,7 @@ classdef MouseTrackerKF < MouseTracker
             fh = figure;
             ah = axes('position', [.1, .1, .7 .8]);
             bgIm = this.plotPathsOnBg();
+            %bgIm = this.plotPaths();
             imshow(bgIm); hold on;
             xlim([0 this.width]);
             ylim([0 this.height]);
@@ -216,7 +217,9 @@ classdef MouseTrackerKF < MouseTracker
                     %line('Parent', ah, 'Xdata', this.areas(fi,this.noseblob(fi)).Centroid(1), 'Ydata', ...
                     %    this.areas(fi,this.noseblob(fi)).Centroid(2), 'Marker', '.', 'MarkerSize', 8, 'Color', plotblue);
                     line('Parent', ah, 'Xdata', this.nosePos(fi,1), 'Ydata', ...
-                        this.nosePos(fi,2), 'Marker', '.', 'MarkerSize', 8, 'Color', plotblue);
+                        this.nosePos(fi,2), 'Marker', '.', 'MarkerSize', 10, 'Color', plotblue);
+                    %line('Parent', ah, 'Xdata', this.nosePos(fi,1), 'Ydata', ...
+                    %    this.nosePos(fi,2), 'Marker', '.', 'MarkerSize', 10, 'Color', 'w');
                 end
             end 
             title(this.videoFN);
@@ -1199,8 +1202,8 @@ classdef MouseTrackerKF < MouseTracker
             else
                 pathNums = 1:length(this.paths);
             end
-            pathIm = cat(3, this.avgFrame, this.avgFrame, this.avgFrame);
-            %pathIm = zeros(this.height, this.width, 3);
+            %pathIm = cat(3, this.avgFrame, this.avgFrame, this.avgFrame);
+            pathIm = zeros(this.height, this.width, 3);
             color_order = [2 1 3];
             for ii = 1:length(pathNums)
                 %set color layer to 255

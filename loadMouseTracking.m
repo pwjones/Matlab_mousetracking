@@ -4,10 +4,10 @@ function ret = loadMouseTracking(files, file_range, following_thresh)
 % Function to load a set of processed videos, their saved MouseTracker
 % objects. For flexibility, FILES can either be a filename or a cell array of strings 
 % with individual movie fileanmes. Subsets can be selected using the FILE_RANGE argument. 
-
-base_fname = '/Users/pwjones/Movies/mouse_training/';
-%following_thresh = 20; %px, the distance from the trail the animal can get before it's counted as not following
+global VIDEO_ROOT;
+base_fname = VIDEO_ROOT;
 class_func = @MouseTrackerKF;
+class_func = @MouseTrackerUnder2;
 %%%%%%%%%%%%%%%% Start in on doing things  %%%%%%%%%%%%%%%%
 if ~iscell(files)
     fid = fopen(files, 'r');
@@ -47,6 +47,7 @@ rew_propFollowed = NaN*zeros(nfiles,1);
 dist_propFollowed = NaN*zeros(nfiles,1);
 dir_nums = NaN*zeros(nfiles,1);
 prev_dir_name = ''; curr_dir_num = 0;
+
 for ii = 1:nfiles
     fullname = fullfile(base_fname, fnames{ii});
     % want to number the days in case we plot performance over days

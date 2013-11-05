@@ -1403,6 +1403,28 @@ classdef MouseTrackerUnder2 < handle
         end
         
         % ------------------------------------------------------------------------------------------------------
+        function prop = propTrailFollowed(this, frames, trailNum, threshDist)
+        % function propTrailFollowed(this, frames, trailNum, threshDist)
+        %
+        % This function returns the proporation of the trail pixels that the mouse came within a given
+        % distance of.  Seems like a clean way of measuring the completeness of his trail exploration.
+        % Algorthmically, this is a similar problem to finding the following segments except reversed.
+        if isempty(frames)
+            frames = 1:this.nFrames;
+        end
+        np = this.nosePos(frames,:);
+        nn = ~isnan(np(:,1));
+        np = np(nn,:);
+        trailPos = this.paths(trailNum).PixelList; 
+        distm = ipdm(single(np), single(trailPos));
+        [trailDist, mini] = nanmin(distm, [], 1);
+        explored = find(trailDist <= threshDist);
+        npx = length(this.paths(trailNum).PixelIdxList);
+        prop = length(explored)/npx;
+        
+        end
+        
+        % ------------------------------------------------------------------------------------------------------
         function turning_total = totalTurning(this, frames)
             measure_name = 'direction';
             measure = this.(measure_name);

@@ -1,7 +1,7 @@
 %let's read the file telling us what sections to load
 
 %Analysis Parameters
-following_thresh = 20; %px, the distance from the trail the animal can get before it's counted as not following
+following_thresh = 15; %px, the distance from the trail the animal can get before it's counted as not following
 MouseTrackerObj = @MouseTrackerKF;
 %vid_list = '3082files.txt';
 vid_list = '9085files.txt';

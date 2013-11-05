@@ -7,7 +7,7 @@ folders = {'130912', '130913', '130916', '130917', '130918', '130919', '130920',
            '130927', '131001', '131002', '131003', '131004', '131007', '131008', '131009', '131010', '131011', '131014', ...
            '131015', '131016', '131017', '131018', '131021', '131022', '131023', '131024', '131025', '131028', '131029', '131030'};
 base_folder = VIDEO_ROOT;
-followingThresh = 15;
+following_thresh = 15;
 clear perMouseData;
 
 videoList = listBehavioralVideos(base_folder, folders, mouse_names);
@@ -15,14 +15,15 @@ videoList = listBehavioralVideos(base_folder, folders, mouse_names);
 s = matlabpool('size');
 if s~=0
     parfor ii = 1:length(videoList)
-        perMouseData(ii) = loadMouseTracking(videoList{ii}, 1:length(videoList{ii}), followingThresh);
+        perMouseData(ii) = loadMouseTracking(videoList{ii}, 1:length(videoList{ii}), following_thresh);
     end
 else
     for ii = 1:length(videoList)
-        perMouseData(ii) = loadMouseTracking(videoList{ii}, 1:length(videoList{ii}), followingThresh);
+        perMouseData(ii) = loadMouseTracking(videoList{ii}, 1:length(videoList{ii}), following_thresh);
     end
 end
 
+save 'fallCohortData.mat' perMouseData;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Let's Make a BUNCH OF PLOTS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% Plot the time on trail over time.
@@ -250,11 +251,12 @@ end
 
 % We need to define the trials for which the mice are occluded. Since they are occluded in different
 % orders this needs to be specified on a per mouse basis.
-ctl_trials = {42:72, 46:76, 43:73, 44:74, 26:45, 26:45, 26:45, 26:45};
-occr_trials = {73:103, 77:107, 74:111, 75:104, 26:35, 26:36, 26:35, 26:35}; %each cell is a mouse
-occl_trials = {16:25, 16:25, 16:25, 16:25, 16:25, 16:25, 16:25, 16:25};
+%ctl_trials = {42:72, 46:76, 43:73, 44:74, 26:45, 26:45, 26:45, 26:45};
+%occr_trials = {73:103, 77:107, 74:111, 75:104, 26:35, 26:36, 26:35, 26:35}; %each cell is a mouse
+%occl_trials = {16:25, 16:25, 16:25, 16:25, 16:25, 16:25, 16:25, 16:25};
 %ctl2_trails = {100:103
 nMice = length(perMouseData);
+nRows = ceil(sqrt(nMice));
 fh = figure; hold on;
 for ii = 1:nMice
     rew_free = perMouseData(ii).rew_dists_from_trail_persect(ctl_trials{ii});
@@ -264,6 +266,6 @@ for ii = 1:nMice
     
     figure(fh);
     ah = subplot(nRows, nRows, ii); %square, many panels
-    plotDistanceHistComparison(rew_free, dist_free, rew_occ, dist_occ, followingThresh, '', ah);
+    plotDistanceHistComparison(rew_free, dist_free, rew_occ, dist_occ, following_thresh, '', ah);
     axes(ah); title(mouse_names{ii});
 end
