@@ -4,6 +4,7 @@ classdef MouseTrackerKF < MouseTracker
         used_thresh = 0;
         p_mouse = .0008; %the proportion of pixels that are 
         kf = struct('nstates', {}, 'nob', {}, 's', {});
+        mm_conv = 1.16; %mm/px linear
     end
     
     methods
@@ -1259,7 +1260,10 @@ classdef MouseTrackerKF < MouseTracker
         % frames - the frames to be considered
         % pathNum - path number, generally 1 for rewarded, 2 for unrewarded
         % varargin - 1) the threshold distance for which to return the frames where the distance is within.
-            
+        % Always returns a POSITIVE distance
+            if isempty(frames)
+                frames = 1:this.nFrames;
+            end
             if (length(this.paths) >= pathNum)
                 nosePos = this.nosePos(frames,:);
                 trailPos = this.paths(pathNum).PixelList;
@@ -1284,8 +1288,9 @@ classdef MouseTrackerKF < MouseTracker
             end
             if ~isempty(varargin)
                 thresh_dist = varargin{1}; %varargin 1 is the threshold distance to only return those distances under that
+                %noseDist = noseDist * this.mm_conv;
                 seli = noseDist < thresh_dist;
-                noseDist = noseDist(seli);
+                noseDist = noseDist(seli) ;
                 ret_frames = frames(seli);
                 vects = vects(seli,:);
             else
@@ -1328,8 +1333,10 @@ classdef MouseTrackerKF < MouseTracker
         % ------------------------------------------------------------------------------------------------------
         function dists = orthogonalDistFromTrail(this, frames, pathNum)
         % function dists = orthogonalDistFromTrail(this, frames)
-        %
-        % Let's put several pieces together
+        % 
+        % This function returns a signed value - leftward is negative, 
+        % rightward is positive! Let's put several pieces together
+            if isempty(frames) frames = 1:this.nFrames; end
             [noseDist, vects, ~] = this.noseDistToTrail(frames, pathNum);
             orthoTheta = mod(cart2pol(vects(:,1), vects(:,2)),2*pi);
             headingTheta = mod(this.headingFromBodyToNose(frames),2*pi);
@@ -1341,6 +1348,26 @@ classdef MouseTrackerKF < MouseTracker
             %dists(negi) = -1*dists(negi); %switch the sign of some
             
         end
+        
+        % ------------------------------------------------------------------------------------------------------
+        function [crossings, dir, dists] = findTrailCrossings(this, frames, pathNum)
+        % function [crossings, dir] = findTrailCrossings(this, frames, pathNum)
+        %
+        % This is the best function in the world. Finds trail crossings, and tells you the direction of
+        % each.  From left->right is positive, from right->left is negative.
+            dist_thresh = 5;
+            dists = this.orthogonalDistFromTrail(frames, pathNum);
+            s1 = dists(1:end-1);
+            s2 = dists(2:end);
+            c = s1.*s2; % find the points where the distance from the trail changes sign, smart
+            crossings = find(c < 0); 
+            crossing_dists = dists(crossings); %also have to select the actual crossings, rather than the
+                                               %mouse turning far from the trail.
+            ci = abs(crossing_dists) < dist_thresh;
+            crossings = crossings(ci);
+            dir = dists(crossings) < 0;
+            dists = dists(crossings);
+        end    
         
         % ------------------------------------------------------------------------------------------------------
         function meanDist = meanOrthogonalDistFromTrail(this, frames, pathNum)
@@ -1456,8 +1483,8 @@ classdef MouseTrackerKF < MouseTracker
             distTraveled = 0;
             frameNums = [1 1];
         end
-        %distTraveled_ret(ii) = distTraveled(ii);
-        distTraveled_ret = distTraveled;
+        distTraveled_ret(ii) = distTraveled(ii);
+        %distTraveled_ret = distTraveled * this.mm_conv;
         frameNums_ret = frameNums;
         end
         
@@ -1533,6 +1560,7 @@ classdef MouseTrackerKF < MouseTracker
                 %f = this.readFrames(framei);
                 %imshow(f.frames.cdata); 
                 f = this.readMovieSection(framei, movieType);
+                f = this.plotPathsOnFrame(f);
                 imshow(f);
                 %imshow(imabsdiff(f.frames.cdata, this.avgFrame));
                 hold on;
@@ -1563,6 +1591,40 @@ classdef MouseTrackerKF < MouseTracker
            set(gca, 'xlim', [dispCrop(1) dispCrop(3)], 'ylim', [dispCrop(2) dispCrop(4)]);
         end
         
+        function pathIm = plotPathsOnFrame(this,inFrame,pathNums)
+            pathIm = inFrame;
+            if isempty(this.paths)
+                return;
+            else
+                if (~exist('pathNums','var'))  
+                    pathNums = 1:length(this.paths);
+                elseif(~isempty(pathNums)) %if we're given a set of paths, use that, otherwise plot all of them
+                    pathNums = intersect(1:length(this.paths), pathNums); %make sure we don't try to plot anything not there
+                else
+                    pathNums = 1:length(this.paths);
+                end
+                %pathIm = cat(3, this.avgFrame, this.avgFrame, this.avgFrame);
+                pathIm = cat(3, inFrame, inFrame, inFrame);
+                %pathIm = zeros(this.height, this.width, 3);
+                color_order = [2 1 3];
+                for ii = 1:length(pathNums)
+                    %set color layer to 255
+                    pi = pathNums(ii);
+                    c = color_order(mod(pi-1, 3)+1);
+                    layer = pathIm(:,:,c);
+                    layer(this.paths(pi).PixelIdxList) = 255;
+                    pathIm(:,:,c) = layer;
+                    oc = find(1:3 ~= c);
+                    %set the other layers to 0
+                    layer = pathIm(:,:,oc(1));
+                    layer(this.paths(pi).PixelIdxList) = 0;
+                    pathIm(:,:,oc(1)) = layer;
+                    layer = pathIm(:,:,oc(2));
+                    layer(this.paths(pi).PixelIdxList) = 0;
+                    pathIm(:,:,oc(2)) = layer;
+                end
+            end
+        end
         
         % ------------------------------------------------------------------------------------------------------
         %           

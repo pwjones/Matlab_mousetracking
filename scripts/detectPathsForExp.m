@@ -13,7 +13,7 @@ if ~exist('vids', 'var') %if the vids variable doesn't exist, process/load a sel
     vids = processVideoFolder(exp_name, @MouseTrackerKF);
 end
 vidi = 1:length(vids);
-vidi = 12:16;
+%vidi = 12:16;
 %vidi = 15:length(vids);
 for ii = vidi
     vids(ii).detectRefinePaths(1,1,1);

@@ -1,0 +1,44 @@
+% plotPopulationNoseTrajectories
+%
+
+winlen = length(perMouseData(1).traj_window);
+ctl_traj = []; ctl_dir = []; run_means_ctl = [];
+occr_traj = []; occr_dir = []; run_means_occr = [];
+for ii = 2:nMice
+    tnums = ctl_trials{ii};
+    for jj=1:length(tnums)
+        ctl_traj = cat(1, ctl_traj, perMouseData(ii).nose_trajectories{tnums(jj)});
+        ctl_dir = cat(1, ctl_dir, perMouseData(ii).traj_dir{tnums(jj)});
+    end
+    tnums = occr_trials{ii};
+    for jj=1:length(tnums)
+        occr_traj = cat(1, occr_traj, perMouseData(ii).nose_trajectories{tnums(jj)});
+        occr_dir = cat(1, occr_dir, perMouseData(ii).traj_dir{tnums(jj)});
+    end
+end
+traj_window = perMouseData(1).traj_window;
+
+%plot some stuff
+ltr = ctl_dir > 0;
+mean_ltr_ctl = nanmean(ctl_traj(ltr,:));
+std_ltr_ctl = nanstd(ctl_traj(ltr,:));
+mean_rtl_ctl = nanmean(ctl_traj(~ltr,:));
+std_rtl_ctl = nanstd(ctl_traj(~ltr,:));
+
+ltr = occr_dir > 0;
+mean_ltr_occr = nanmean(occr_traj(ltr,:));
+std_ltr_occr = nanstd(occr_traj(ltr,:));
+mean_rtl_occr = nanmean(occr_traj(~ltr,:));
+std_rtl_occr = nanstd(occr_traj(~ltr,:));
+
+colors = {'m'; [1 .5 1], 'b', [.3 .3 1]};
+color_order = [ 1 0 1; [1 .5 1]; 0 0 1; .3 .3 1];
+figure;
+main_ah = axes('Position', [.1 .1 .6 .8]);
+plot(traj_window, mean_ltr_ctl, '-', 'Color', colors{1}); hold on;
+plot(traj_window, mean_ltr_occr, '--', 'Color', colors{2}); 
+plot(traj_window, mean_rtl_ctl, '-', 'Color', colors{3});
+traj_window, mean_rtl_occr, '--', 'Colors', colors{4});
+side_ah = axes('Position', [.75 .1 .15, .8], 'colororder', color_order);
+
+set(gca, 'YDir', 'reverse');

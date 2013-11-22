@@ -11,13 +11,23 @@ nRows = ceil(sqrt(nMice));
 fh = figure; hold on;
 for ii = 1:nMice
     rew_free = perMouseData(ii).rew_dists_from_trail_persect(ctl_trials{ii});
-    dist_free = perMouseData(ii).distract_dists_from_trail_persect(ctl_trials{ii});
-    rew_occ = perMouseData(ii).rew_dists_from_trail_persect(occr_trials{ii});
-    dist_occ = perMouseData(ii).distract_dists_from_trail_persect(occr_trials{ii});
+    for jj=1:length(rew_free)
+        rew_free{jj} = mm_conv * rew_free{jj};
+    end
+    rew_occr = perMouseData(ii).rew_dists_from_trail_persect(occr_trials{ii});
+    for jj=1:length(rew_occr)
+        rew_occr{jj} = mm_conv * rew_occr{jj};
+    end
+    rew_occl = perMouseData(ii).rew_dists_from_trail_persect(occl_trials{ii});
+    for jj=1:length(rew_occl)
+        rew_occl{jj} = mm_conv * rew_occl{jj};
+    end
+    
     
     figure(fh);
     ah = subplot(nRows, nRows, ii); %square, many panels
     hold on;
-    plotDistanceHistComparison2(rew_free, rew_occ, following_thresh, '', ah);
+    plotDistanceHistComparison2(rew_free, rew_occr, following_thresh, '', ah);
+    plotDistanceHistComparison2(rew_free, rew_occl, following_thresh, '', ah);
     axes(ah); title(mouse_names{ii});
 end

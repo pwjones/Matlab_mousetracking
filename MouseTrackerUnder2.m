@@ -540,6 +540,30 @@ classdef MouseTrackerUnder2 < handle
             
         end
         
+         % Setting functions for manually altering the tracking result
+        function setTailPosition(this, frame, pos)
+            frame = frame(1);
+            centers = [this.areas(frame, :).Centroid];
+            centers = reshape(centers, 2, [])';
+            dist = ipdm(centers, pos);
+            if nanmin(dist) < 10
+                [min_dist, disti] = nanmin(dist);
+                this.tailblob(frame) = disti;
+            end
+        end
+        
+        function setNosePosition(this, frame, pos)
+            frame = frame(1);
+            centers = [this.areas(frame, :).Centroid];
+            centers = reshape(centers, 2, [])';
+            dist = ipdm(centers, pos);
+            if nanmin(dist) < 10
+                [min_dist, disti] = nanmin(dist);
+                this.noseblob(frame) = disti;
+                this.nosePos(frame,:) = this.areas(frame,disti).Centroid;
+            end
+        end
+        
     %end
     
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%% PRIVATE METHODS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -677,6 +701,16 @@ classdef MouseTrackerUnder2 < handle
             dists = sqrt(sum(dists.^2,2));
             toofar = dists > 100;
             nosep(toofar,:) = NaN*zeros(sum(toofar), 2);
+        end
+        
+        % ------------------------------------------------------------------------------------------------------
+        function nose_jumps = findNoseJumps(this, dist_thresh, frames)
+            % reports the first frame after there is a large jump in the nose position
+            if isempty(frames)
+                frames = 1:this.nFrames;
+            end
+            dists = sqrt(sum(diff(this.nosePos(frames,:)).^2, 2));
+            nose_jumps = find(dists >= dist_thresh);
         end
         
         % ------------------------------------------------------------------------------------------------------
@@ -1625,7 +1659,7 @@ classdef MouseTrackerUnder2 < handle
             end
             %thresh = .09; %.09; %this seems to work after image normalization, .08
             thresh(2) = 1 * graythresh(diff_mov);
-            thresh(1) =  .4 * thresh(2);
+            thresh(1) =  .7 * thresh(2);
             %thresh(1) = .08; .11;
             if ~isempty(varargin) && ~isempty(varargin{1}) % I'm not exactly sure MATLAB is making empty cells
                 thresh(1) = varargin{1}; 

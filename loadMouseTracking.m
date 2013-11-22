@@ -7,7 +7,8 @@ function ret = loadMouseTracking(files, file_range, following_thresh)
 global VIDEO_ROOT;
 base_fname = VIDEO_ROOT;
 class_func = @MouseTrackerKF;
-class_func = @MouseTrackerUnder2;
+%class_func = @MouseTrackerUnder2;
+mm_conv = 1.16; %mm/px linear
 %%%%%%%%%%%%%%%% Start in on doing things  %%%%%%%%%%%%%%%%
 if ~iscell(files)
     fid = fopen(files, 'r');
@@ -32,12 +33,16 @@ fnames = fnames(file_range);
 nfiles = length(fnames);
 rew_prop = NaN*zeros(nfiles,1);
 dist_prop = NaN*zeros(nfiles,1);
+fake_prop = NaN*zeros(nfiles,1);
 rew_dists = cell(nfiles,1);
 distract_dists = cell(nfiles,1);
 rew_dists_from_trail = cell(nfiles,1);
 distract_dists_from_trail = cell(nfiles,1);
 rew_dists_from_trail_persect = cell(nfiles,1);
 distract_dists_from_trail_persect = cell(nfiles,1);
+nose_trajectories = cell(nfiles,1);
+traj_dir = cell(nfiles, 1);
+traj_window = [];
 total_frames = NaN*zeros(nfiles,1);
 frame_rate = NaN*zeros(nfiles,1);
 total_turning = NaN*zeros(nfiles,1);
@@ -64,25 +69,28 @@ for ii = 1:nfiles
 %    mt.plotFollowing([], following_thresh, 0);
     rew_prop(ii) = mt.propTimeOnTrail([],1,following_thresh);
     dist_prop(ii) = mt.propTimeOnTrail([],2,following_thresh);
-    rew_dists{ii} = mt.distanceOnTrail([],1,following_thresh);
-    distract_dists{ii} = mt.distanceOnTrail([],2,following_thresh);
-    rew_dists_from_trail{ii} = mt.orthogonalDistFromTrail(1:mt.nFrames,1);
-    distract_dists_from_trail{ii} = mt.orthogonalDistFromTrail(1:mt.nFrames,2);
-    rew_dists_from_trail_persect{ii} = mt.orthogonalDistFromTrailPerSection(1:mt.nFrames,1, following_thresh);
-    distract_dists_from_trail_persect{ii} = mt.orthogonalDistFromTrailPerSection(1:mt.nFrames,2, following_thresh);
+    fake_prop(ii) = mt.propTimeOnTrail([], 3,following_thresh);
+    rew_dists{ii} = mt.distanceOnTrail([],1,following_thresh) * mm_conv;
+    distract_dists{ii} = mt.distanceOnTrail([],2,following_thresh) * mm_conv;
+    rew_dists_from_trail{ii} = mt.orthogonalDistFromTrail(1:mt.nFrames,1) * mm_conv;
+    distract_dists_from_trail{ii} = mt.orthogonalDistFromTrail(1:mt.nFrames,2) * mm_conv;
+    rew_dists_from_trail_persect{ii} = mt.orthogonalDistFromTrailPerSection(1:mt.nFrames,1, following_thresh) * mm_conv;
+    distract_dists_from_trail_persect{ii} = mt.orthogonalDistFromTrailPerSection(1:mt.nFrames,2, following_thresh) * mm_conv;
     total_turning(ii) = mt.totalTurning(1:mt.nFrames);
+    [nose_trajectories{ii}, traj_dir{ii}, traj_window] = noseTrajectories(mt);
     % now collect a few factors about each of the movies
     total_frames(ii) = mt.nFrames;
     frame_rate(ii) = mt.frameRate;
-    rew_trail_area(ii) = mt.paths(1).Area;
-    dist_trail_area(ii) = mt.paths(2).Area;
-    rew_propFollowed(ii) = mt.propTrailFollowed([], 1, 15);
-    dist_propFollowed(ii) = mt.propTrailFollowed([],2,15);
+    rew_trail_area(ii) = mt.paths(1).Area * mm_conv^2;
+    dist_trail_area(ii) = mt.paths(2).Area * mm_conv^2;
+    rew_propFollowed(ii) = mt.propTrailFollowed([], 1, 10);
+    dist_propFollowed(ii) = mt.propTrailFollowed([],2,10);
 end
 
 % Results
 ret.rew_prop = rew_prop;
 ret.dist_prop = dist_prop;
+ret.fake_prop = fake_prop;
 ret.rew_dists = rew_dists;
 ret.distract_dists = distract_dists;
 ret.total_frames = total_frames;
@@ -97,3 +105,6 @@ ret.dist_trail_area = dist_trail_area;
 ret.rew_propFollowed = rew_propFollowed;
 ret.dist_propFollowed = dist_propFollowed;
 ret.dir_nums = dir_nums;
+ret.nose_trajectories = nose_trajectories;
+ret.traj_window = traj_window;
+ret.traj_dir = traj_dir;

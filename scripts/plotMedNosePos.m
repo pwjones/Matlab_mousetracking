@@ -4,9 +4,11 @@
 % orders this needs to be specified on a per mouse basis.
 
 % perMouseData is present and has multiple mice
-following_thresh = 15;
+following_thresh = 20;
+mm_conv = 1.16; %mm/px conversion
 mouse_names = {'16220', '16221', '16227', '16231', '3090', '3091'};
 %mouse_names = {'16220', '16221', '16227', '16231'};
+train_trials = {1:72, 1:76, 1:73, 1:74, 1:35, 1:70};
 ctl_trials = {42:72, 46:76, 43:73, 44:74, 35:67, 70:100};
 occr_trials = {[], 77:107, 74:111, 75:104, 16:34, 101:138}; %each cell is a mouse
 occl_trials = {73:103, [], [], [], 68:94, 193:212};
@@ -24,7 +26,8 @@ for ii = 1:nMice
     following_dists = [];
     for jj = 1:length(all_dists)
         trial_dists = all_dists{jj};
-        fi = find(abs(trial_dists) <= following_thresh);
+        %fi = find(abs(trial_dists) <= following_thresh & ~isnan(trial_dists));
+        fi = find(~isnan(trial_dists));
         following_dists = cat(1, following_dists, trial_dists(fi));
     end
     nose_pos_ctl{ii} = following_dists;
@@ -35,7 +38,8 @@ for ii = 1:nMice
     following_dists = [];
     for jj = 1:length(all_dists)
         trial_dists = all_dists{jj};
-        fi = find(abs(trial_dists) <= following_thresh);
+        %fi = find(abs(trial_dists) <= following_thresh & ~isnan(trial_dists));
+        fi = find(~isnan(trial_dists));
         following_dists = cat(1, following_dists, trial_dists(fi));
     end
     nose_pos_ctl2{ii} = following_dists;
@@ -45,7 +49,8 @@ for ii = 1:nMice
     following_dists = [];
     for jj = 1:length(all_dists)
         trial_dists = all_dists{jj};
-       fi = find(abs(trial_dists) <= following_thresh);
+        %fi = find(abs(trial_dists) <= following_thresh & ~isnan(trial_dists));
+        fi = find(~isnan(trial_dists));
         following_dists = cat(1, following_dists, trial_dists(fi));
     end
     nose_pos_occr{ii} = following_dists;
@@ -55,7 +60,8 @@ for ii = 1:nMice
     following_dists = [];
     for jj = 1:length(all_dists)
         trial_dists = all_dists{jj};
-        fi = find(abs(trial_dists) <= following_thresh);
+        %fi = find(abs(trial_dists) <= following_thresh & ~isnan(trial_dists));
+        fi = find(~isnan(trial_dists));
         following_dists = cat(1, following_dists, trial_dists(fi));
     end
     nose_pos_occl{ii} = following_dists;
@@ -93,6 +99,6 @@ for ii = 1:nMice
 end
 
 % Make some asthetic changes to the plot
-set(gca, 'FontSize', 12, 'xtick', 1:3, 'xticklabel', {'Left Occluded', 'Unoccluded', 'Right Occluded'});
-ylabel('Median Distance from Trail (px)', 'FontSize', 14);
+set(gca, 'FontSize', 12, 'xtick', 1:3, 'xticklabel', {'Left Occluded', 'Unoccluded', 'Right Occluded'}, 'TickDir', 'out');
+ylabel('Median Distance from Trail (mm)', 'FontSize', 14);
 

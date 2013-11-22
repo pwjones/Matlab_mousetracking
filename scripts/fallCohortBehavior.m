@@ -1,13 +1,9 @@
 % Process the behavior of the fall cohort of mice.
 % Peter Jones, 9.20.2013
 
-mouse_names = {'16220', '16221', '16226','16227', '16228', '16229', '16231', '16232'};
-mouse_names = {'16220', '16221', '16227', '16231'};
-folders = {'130912', '130913', '130916', '130917', '130918', '130919', '130920', '130923', '130924', '130925', '130926', ...
-           '130927', '131001', '131002', '131003', '131004', '131007', '131008', '131009', '131010', '131011', '131014', ...
-           '131015', '131016', '131017', '131018', '131021', '131022', '131023', '131024', '131025', '131028', '131029', '131030'};
+fallCohortList; % this script contains the mouse and file names to be included in the analysis.
 base_folder = VIDEO_ROOT;
-following_thresh = 15;
+following_thresh = 20; %mm
 clear perMouseData;
 
 videoList = listBehavioralVideos(base_folder, folders, mouse_names);
@@ -23,7 +19,7 @@ else
     end
 end
 
-save 'fallCohortData.mat' perMouseData;
+save 'fallCohortData_20mm_followingthresh.mat' perMouseData;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Let's Make a BUNCH OF PLOTS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% Plot the time on trail over time.
@@ -33,7 +29,7 @@ title('Trail Fraction Followed per Trial');
 nMice = length(perMouseData);
 nRows = ceil(sqrt(nMice));
 for ii = 1:nMice
-    subplot(nRows, nRows, ii); %square, many panels
+    %subplot(nRows, nRows, ii); %square, many panels
     nTrials = length(perMouseData(ii).rew_dists);
     plot(perMouseData(ii).rew_prop*100, 'g'); hold on;
     plot(perMouseData(ii).dist_prop*100, 'r');
@@ -41,14 +37,15 @@ for ii = 1:nMice
     samps_cut = floor(length(boxcar)/2);
     vi = (1+samps_cut):(length(perMouseData(ii).rew_prop)-samps_cut);
     xl = length(vi)+samps_cut;
-    plot([1 xl], [35 35], '--k');
+    %plot([1 xl], 100*[mean(perMouseData(ii).rew_prop) mean(perMouseData(ii).rew_prop)], 'k--');
+    %plot([1 xl], [35 35], '--k'); hold on;
     %fake_prop_filt = conv(fake_prop, boxcar,'valid');
     rew_prop_filt = conv(perMouseData(ii).rew_prop, boxcar,'valid');
     dist_prop_filt = conv(perMouseData(ii).dist_prop, boxcar,'valid');
     %vi = (1+samps_cut):(samps_cut+length(rew_prop_filt));
     %flh = plot(vi, fake_prop_filt*100,'LineWidth',2, 'Color', [.25 .25 .25]);
-    plot(vi, rew_prop_filt*100, 'g', 'LineWidth',2);
-    plot(vi, dist_prop_filt*100, 'r', 'LineWidth',2);
+    plot(vi, rew_prop_filt*100, 'g', 'LineWidth',3);
+    plot(vi, dist_prop_filt*100, 'r', 'LineWidth',3);
     set(gca, 'TickDir','out', 'fontsize', 16);
     xlabel('Trial #','FontSize', 18);
     ylabel('% Time on Trail','FontSize', 18);
@@ -93,6 +90,7 @@ end
 figure; hold on;
 title('Trail Crossings', 'FontSize', 16);
 for jj = 1:length(perMouseData)
+    hold on;
     plot(perMouseData(jj).crossing_rates(:,1), 'g', 'LineWidth',.5); hold on; 
     plot(perMouseData(jj).crossing_rates(:,2), 'r', 'LineWidth',.5);
     rew_crossingrates_filt = conv(perMouseData(jj).crossing_rates(:,1), boxcar,'valid');
@@ -139,11 +137,11 @@ end
 
 %% Plotting the sum of the distance traveled near the trail
 figure; hold on;
-title('Trail Fraction Followed per Trial');
+title('Total distance traveled near trail');
 nMice = length(perMouseData);
 nRows = ceil(sqrt(nMice));
-for ii=1:nMice
-   subplot(nRows, nRows, ii); %square, many panels
+for ii=1:4
+   %subplot(nRows, nRows, ii); %square, many panels
    nTrials = length(perMouseData(ii).rew_dists);
    rew_dist = []; distract_dist = [];
    for jj = 1:nTrials
@@ -152,9 +150,18 @@ for ii=1:nMice
       followingDists = perMouseData(ii).distract_dists{jj};
       distract_dist(jj) = sum(followingDists);   
    end
-   plot(1:nTrials,rew_dist, 'g-', 'LineWidth', 2); hold on;
-   plot(1:nTrials,distract_dist, 'r-', 'LineWidth', 2); hold on;
-   xlabel('Trial Number');
+   x = 1:nTrials;
+   tt = train_trials{ii};
+   boxcar = [1 1 1 1 1]./ 5;
+   samps_cut = floor(length(boxcar)/2);
+   vi = (1+samps_cut):(length(rew_dist)-samps_cut);
+   rew_dist_filt = conv(rew_dist, boxcar,'valid');
+   distract_dist_filt = conv(distract_dist, boxcar,'valid');
+   plot(x,rew_dist, 'g-', 'LineWidth', .5); hold on;
+   plot(x,distract_dist, 'r-', 'LineWidth', .5); hold on;
+   plot(vi,rew_dist_filt, 'g-', 'LineWidth', 3); hold on;
+   plot(vi,distract_dist_filt, 'r-', 'LineWidth', 3); hold on;
+   xlabel('Trial Number'); ylabel('Distance traveled near trail');
    title(mouse_names{ii});
    %ylim([0 1000]);
 end
@@ -166,36 +173,43 @@ title('Trail Fraction Followed per Trial');
 nMice = length(perMouseData);
 nRows = ceil(sqrt(nMice));
 for ii=1:nMice
-   subplot(nRows, nRows, ii); %square, many panels
-   nTrials = length(perMouseData(ii).rew_dists);
+   %subplot(nRows, nRows, ii); %square, many panels
+   nTrials(ii) = length(perMouseData(ii).rew_dists);
    rew_dist = []; distract_dist = [];
-   for jj = 1:nTrials
+   for jj = 1:nTrials(ii)
       %followingDists = perMouseData(ii).rew_propFollowed(jj);
       rew_dist(jj) = perMouseData(ii).rew_propFollowed(jj);
       %followingDists = perMouseData(ii).distract_dists{jj};
       distract_dist(jj) = perMouseData(ii).dist_propFollowed(jj);   
    end
-   plot(1:nTrials,rew_dist, 'g-', 'LineWidth', .5); hold on;
-   plot(1:nTrials,distract_dist, 'r-', 'LineWidth', .5); hold on;
+   x = 1:nTrials(ii);
+   tt = train_trials{ii};
+   plot(x(tt),rew_dist(tt), 'g-', 'LineWidth', .5); hold on;
+   plot(x(tt),distract_dist(tt), 'r-', 'LineWidth', .5); hold on;
    boxcar = [1 1 1 1 1]./ 5;
    samps_cut = floor(length(boxcar)/2);
    vi = (1+samps_cut):(length(rew_dist)-samps_cut);
    rew_dist_filt = conv(rew_dist, boxcar,'valid');
    distract_dist_filt = conv(distract_dist, boxcar,'valid');
-   plot(vi,rew_dist_filt, 'g-', 'LineWidth', 2); hold on;
-   plot(vi,distract_dist_filt, 'r-', 'LineWidth', 2); hold on;
-   xlabel('Trial Number'); ylabel('Prop of Trail Followed');
+   plot(vi(tt),rew_dist_filt(tt), 'g-', 'LineWidth', 3); hold on;
+   plot(vi(tt),distract_dist_filt(tt), 'r-', 'LineWidth', 3); hold on;
+   xlabel('Trial Number','FontSize', 14); ylabel('Prop of Trail Followed','FontSize', 14);
+   set(gca, 'TickDir', 'out', 'FontSize', 12)
    title(mouse_names{ii});
    %ylim([0 1000]);
 end
+maxTrials = max(nTrials);
 
+%%
 % Plotting the number of trail pixels followed
 figure; hold on;
 title('Trail Areas');
 nMice = length(perMouseData);
 nRows = ceil(sqrt(nMice));
+avgRew = NaN.*zeros(maxTrials, nMice);
+avgDistract = NaN.*zeros(maxTrials, nMice);
 for ii=1:nMice
-   subplot(nRows, nRows, ii); %square, many panels
+   %subplot(nRows, nRows, ii); %square, many panels
    nTrials = length(perMouseData(ii).rew_dists);
    rew_dist = []; distract_dist = [];
    for jj = 1:nTrials
@@ -204,18 +218,27 @@ for ii=1:nMice
       %followingDists = perMouseData(ii).distract_dists{jj};
       distract_dist(jj) = perMouseData(ii).dist_trail_area(jj)*perMouseData(ii).dist_propFollowed(jj);   
    end
-   plot(1:nTrials,rew_dist, 'g-', 'LineWidth', .5); hold on;
-   plot(1:nTrials,distract_dist, 'r-', 'LineWidth', .5); hold on;
+   x = 1:nTrials;
+   tt = train_trials{ii};
+   plot(x(tt),rew_dist(tt)/5, 'g-', 'LineWidth', .5); hold on;
+   plot(x(tt),distract_dist(tt)/5, 'r-', 'LineWidth', .5); hold on;
+   avgRew(1:length(rew_dist),ii) = rew_dist(:);
+   avgDistract(1:length(distract_dist),ii) = distract_dist(:);
    vi = (1+samps_cut):(length(rew_dist)-samps_cut);
    rew_dist_filt = conv(rew_dist, boxcar,'valid');
    distract_dist_filt = conv(distract_dist, boxcar,'valid');
-   plot(vi,rew_dist_filt, 'g-', 'LineWidth', 2); hold on;
-   plot(vi,distract_dist_filt, 'r-', 'LineWidth', 2); hold on;
-   xlabel('Trial Number'); ylabel('Trail Area Followed');
+   plot(vi(tt),rew_dist_filt(tt)/5, 'g-', 'LineWidth', 3); hold on;
+   plot(vi(tt),distract_dist_filt(tt)/5, 'r-', 'LineWidth', 3); hold on;
+   xlabel('Trial Number','FontSize', 14); ylabel('Trail Area Followed, mm^2','FontSize', 14);
+   set(gca, 'TickDir', 'out', 'FontSize', 12)
    title(mouse_names{ii});
-   %ylim([0 1000]);
+   ylim([0 1500]);
 end
+%plot(1:maxTrials, nanmean(avgRew,2),'g-', 'LineWidth',2);
+%plot(1:maxTrials, nanmean(avgDistract,2),'r-', 'LineWidth',2);
 
+
+%%
 % Plotting the area of trail followed as a rate - This gives a measure of diligence in trail following
 % This is the most similar to percentage of time on trail, but is based specifically on the amount of
 % trail the animal covers.
@@ -224,7 +247,7 @@ title('Trail Areas');
 nMice = length(perMouseData);
 nRows = ceil(sqrt(nMice));
 for ii=1:nMice
-   subplot(nRows, nRows, ii); %square, many panels
+   %subplot(nRows, nRows, ii); %square, many panels
    nTrials = length(perMouseData(ii).rew_dists);
    rew_dist = []; distract_dist = []; movie_time = [];
    for jj = 1:nTrials
@@ -234,16 +257,19 @@ for ii=1:nMice
       %followingDists = perMouseData(ii).distract_dists{jj};
       distract_dist(jj) = perMouseData(ii).dist_trail_area(jj)*perMouseData(ii).dist_propFollowed(jj);   
    end
+   x = 1:nTrials;
+   tt = train_trials{ii};
    rew_dist = rew_dist./movie_time; distract_dist = distract_dist./movie_time; %Make them rates
-   plot(1:nTrials,rew_dist, 'g-', 'LineWidth', .5); hold on;
-   plot(1:nTrials,distract_dist, 'r-', 'LineWidth', .5); hold on;
+   plot(x(tt),rew_dist(tt), 'g-', 'LineWidth', .5); hold on;
+   plot(x(tt),distract_dist(tt), 'r-', 'LineWidth', .5); hold on;
    vi = (1+samps_cut):(length(rew_dist)-samps_cut);
    rew_dist_filt = conv(rew_dist, boxcar,'valid');
    distract_dist_filt = conv(distract_dist, boxcar,'valid');
-   plot(vi,rew_dist_filt, 'g-', 'LineWidth', 2); hold on;
-   plot(vi,distract_dist_filt, 'r-', 'LineWidth', 2); hold on;
-   xlabel('Trial Number'); ylabel('Trail Area Following Rate');
+   plot(vi(tt),rew_dist_filt(tt), 'g-', 'LineWidth', 3); hold on;
+   plot(vi(tt),distract_dist_filt(tt), 'r-', 'LineWidth', 3); hold on;
+   xlabel('Trial Number','FontSize', 14); ylabel('Trail Area Following Rate, mm^2/sec','FontSize', 14);
    title(mouse_names{ii});
+   set(gca, 'TickDir', 'out', 'FontSize', 12)
    %ylim([0 1000]);
 end
 
