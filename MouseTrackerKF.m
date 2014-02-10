@@ -5,6 +5,8 @@ classdef MouseTrackerKF < MouseTracker
         p_mouse = .0008; %the proportion of pixels that are 
         kf = struct('nstates', {}, 'nob', {}, 's', {});
         mm_conv = 1.16; %mm/px linear
+        blob_num = 1;
+        blobID = [];
     end
     
     methods
@@ -26,6 +28,7 @@ classdef MouseTrackerKF < MouseTracker
             
             % All of the proper initialization is done in the MouseTracker object this is inherited from
             this = this@MouseTracker(varargin{:});
+            this.blobID = NaN*zeros(size(this.areas)); %implementing a unique ID assigment for each blob to facilitate assignment
 %            
         end %function MouseTrackerKF
         % ------------------------------------------------------------------------------------------------------
@@ -544,7 +547,7 @@ classdef MouseTrackerKF < MouseTracker
                     end
                     this.nblobs(fi) = min(this.maxBlobs, length(temp_reg)); %take the biggest N blobs
                     this.areas(segFrames(ii),1:this.nblobs(fi)) = temp_reg(1:this.nblobs(fi)); %only keep the top sized blobs
-                    
+                    this.assignBlobIDs(segFrames(ii)); % give the blobs unique IDs
                     this.detectTail(fi);
                     this.bodyCOM(fi,:) = this.computeBodyPos(fi,1); % 1) get the center of mass of animal
                     [this.nosePos(fi,:), this.noseblob(fi)] = this.findNose(fi); % 2) get the nose blob
@@ -596,6 +599,41 @@ classdef MouseTrackerKF < MouseTracker
                 end
             end
         end
+        
+        % ------------------------------------------------------------------------------------------------------
+        function assignBlobIDs(this, frame)
+            % Assigns unique IDs to blobs based on their overlap with past blobs.  If you have a >80% overlap, you are assumed to 
+            % be the same blob and therefore get teh same identifier.  If you don't, you get a new one.  
+            fi = frame;
+            if (frame ~= 1)
+                prev = this.areas(frame-1, 1:this.nblobs(fi-1));
+                for ii = 1:this.nblobs(fi)
+                    blob = this.areas(frame, ii);
+                    matched = 0;
+                    if ~isempty(prev) %if there were blobs on the last frame
+                        overlap = regionOverlap(blob, prev, this.regprops);
+                        [maxo, maxi] = max(overlap);
+                        com_dist = blob.Centroid - prev(maxi).Centroid;
+                        com_dist = sqrt(sum(com_dist.^2, 2));
+                        if maxo > .5 || com_dist < 4 % test if they are similar enough to be considered same
+                            matched = 1;
+                        end
+                    end
+                    if matched
+                        this.blobID(frame, ii) = this.blobID(frame-1, maxi);
+                    else 
+                        this.blobID(frame, ii) = this.blob_num;
+                        this.blob_num = this.blob_num+1;
+                    end
+                end
+            else
+                for ii = 1:this.nblobs(fi)
+                    this.blobID(frame, ii) = this.blob_num;
+                    this.blob_num = this.blob_num+1;
+                end
+            end
+        end
+        
         % ------------------------------------------------------------------------------------------------------
         function newPos = correctDetection(this, frame, detectedPos, predictedPos)
             err_thresh = 7;
@@ -1203,8 +1241,8 @@ classdef MouseTrackerKF < MouseTracker
             else
                 pathNums = 1:length(this.paths);
             end
-            %pathIm = cat(3, this.avgFrame, this.avgFrame, this.avgFrame);
-            pathIm = zeros(this.height, this.width, 3);
+            pathIm = cat(3, this.avgFrame, this.avgFrame, this.avgFrame);
+            %pathIm = zeros(this.height, this.width, 3);
             color_order = [2 1 3];
             for ii = 1:length(pathNums)
                 %set color layer to 255
@@ -1572,6 +1610,7 @@ classdef MouseTrackerKF < MouseTracker
                     plot(this.COM(framei,1,jj), this.COM(framei,2,jj), 'r+', 'MarkerSize', 12, 'LineWidth',1);
                     ellipse(this.areas(framei,jj).MajorAxisLength/2, this.areas(framei,jj).MinorAxisLength/2, ...
                             this.orient(framei,jj), this.COM(framei,1,jj),this.COM(framei,2,jj),'r');
+                    text(this.COM(framei,1,jj)+10, this.COM(framei,2,jj), num2str(this.blobID(framei, jj)), 'Color','r', 'FontSize', 14);
                 end
                 line(this.bodyCOM(framei,1), this.bodyCOM(framei,2), 'Marker', 'o', 'Color', 'c','MarkerSize', 12, 'LineWidth',2);
                     %line(this.areas(framei).Extrema(:,1), this.areas(framei).Extrema(:,2), 'Marker', '.', 'Color', 'c');

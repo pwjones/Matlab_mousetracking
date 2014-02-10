@@ -22,7 +22,7 @@ function varargout = reviewTracking(varargin)
 
 % Edit the above text to modify the response to help reviewTracking
 
-% Last Modified by GUIDE v2.5 28-Aug-2013 13:26:47
+% Last Modified by GUIDE v2.5 22-Nov-2013 16:48:35
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -64,7 +64,7 @@ else
 end
 % get the frames to zero in on
 frames = 1:mt.nFrames;
-handles.distThresh = 10;
+handles.distThresh = 8;
 handles.jumpFrames = handles.tracker.findNoseJumps(handles.distThresh, frames);
 if (isempty(handles.jumpFrames))
     handles.jumpFrames = 1;
@@ -80,8 +80,13 @@ set(hObject, 'Toolbar', 'figure');
 set(hObject, 'KeyPressFcn', @(hObject, evt)keyResponder(hObject, evt));
 % The propogation section
 handles.corrThresh = .6;
-
-
+if isempty(mt.blobID) % This is in case there are no blobIDs.  Necessary for easy propogation of changes
+    mt.blob_num = 1;
+    for ii=1:mt.nFrames
+        mt.assignBlobIDs(ii);
+    end
+end
+     
 guidata(hObject, handles); % Update handles structure
 % UIWAIT makes reviewTracking wait for user response (see UIRESUME)
 % uiwait(handles.figure1);
@@ -211,6 +216,26 @@ newFrame = min(handles.currFrame+1, handles.tracker.nFrames);
 handles = changeFrame(hObject, handles, newFrame);
 guidata(hObject, handles);
 
+% --- Executes on button press in adv10_btn.
+function adv10_btn_Callback(hObject, eventdata, handles)
+% hObject    handle to adv10_btn (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+newFrame = min(handles.currFrame+10, handles.tracker.nFrames);
+handles = changeFrame(hObject, handles, newFrame);
+guidata(hObject, handles);
+
+
+% --- Executes on button press in back10_btn.
+function back10_btn_Callback(hObject, eventdata, handles)
+% hObject    handle to back10_btn (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+newFrame = max(handles.currFrame-10, 1);
+handles = changeFrame(hObject, handles, newFrame);
+guidata(hObject, handles);
+
+
 % --- Executes on button press in next_jump_btn.
 function next_jump_btn_Callback(hObject, eventdata, handles)
 % hObject    handle to next_jump_btn (see GCBO)
@@ -305,6 +330,22 @@ function propogate_btn_Callback(hObject, eventdata, handles)
 % hObject    handle to propogate_btn (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
+
+currFrame = handles.currFrame;
+noseID = mt.blobID(currFrame, mt.noseblobs(currFrame));
+% propogate forward
+nf = currFrame + 1; prop = 1;
+while (nf <= mt.nFrames) && prop
+    ids = mt.blobID(nf,:);
+    match = find(noseID == ids);
+    if ~isempty(match)
+        mt.noseblob(nf) = match;
+        mt.nosePos(nf,:) = mt.areas(nf,match).Centroid;
+        prop = 1;
+    else
+        prop = 0;
+    end
+end
 
 
 
