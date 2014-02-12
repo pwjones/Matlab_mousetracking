@@ -615,7 +615,7 @@ classdef MouseTrackerKF < MouseTracker
                         [maxo, maxi] = max(overlap);
                         com_dist = blob.Centroid - prev(maxi).Centroid;
                         com_dist = sqrt(sum(com_dist.^2, 2));
-                        if maxo > .5 || com_dist < 4 % test if they are similar enough to be considered same
+                        if maxo > .5 || com_dist < 7 % test if they are similar enough to be considered same
                             matched = 1;
                         end
                     end
@@ -1763,12 +1763,15 @@ classdef MouseTrackerKF < MouseTracker
             % it out gives the default, and the returned movie is a cell
             % area of 
            
-            new_mov = rawArray(:,:,frame_range);
-            %detection settings
+            
+            %Image Processing Settings
             %thresh(1) = .1; % the threshold level
-            p_mouse = .0007; 
+            p_mouse = .0007; %the prior probability of a mouse pixel.  Influences the threshold.
             erode_size = 3; %the size of erosion mask
-            % boostContrast = 1;
+            do_hpfilter = 1; %flag for highpass filtering
+            alpha = .4; %The paramter for an unsharp filter - subtracts a blurred image from the image to sharpen original
+            hp_size = 10; %pixel size for a high pass filter applied to the image before thresholding.
+            new_mov = rawArray(:,:,frame_range);
             % make a movie from the average frame to subtract
             if ~isempty(subFrame)
                 avg_frame = subFrame;
@@ -1778,6 +1781,10 @@ classdef MouseTrackerKF < MouseTracker
             avg_mov = uint8(repmat(avg_frame, [1 1 size(new_mov,3)]));
             %diff_mov = imabsdiff(new_mov, avg_mov); %this should give a nice moving blob.
             diff_mov = new_mov - avg_mov; %this should give a nice moving blob.
+            if do_hpfilter
+                h = fspecial('unsharp', alpha);
+                diff_mov = imfilter(diff_mov, alpha);
+            end
             if(this.boostContrast)
                 diff_mov = increaseMovContrast(diff_mov);
             end
