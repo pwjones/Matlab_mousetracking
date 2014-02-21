@@ -1,9 +1,6 @@
 % Script to detect the paths for a folder worth of processed videos
 % 10/1/2013
 
-% Script to detect the paths for a folder worth of processed videos
-% 10/1/2013
-
 if ~exist('vids', 'var') %if the vids variable doesn't exist, process/load a selected folder
     base_path = VIDEO_ROOT;
     PathName = uigetdir(base_path, 'Select the folder to process');
@@ -12,10 +9,7 @@ if ~exist('vids', 'var') %if the vids variable doesn't exist, process/load a sel
     exp_name = folders{end};
     vids = processVideoFolder(exp_name, @MouseTrackerKF);
 end
-vidi = 5:length(vids);
-%vidi = 12:16;
-%vidi = 15:length(vids);
+vidi = 1:length(vids);
 for ii = vidi
-    vids(ii).detectRefinePaths(1,1,1);
-    vids(ii).save();
+    vids(ii).plotNosePosition([]);
 end
