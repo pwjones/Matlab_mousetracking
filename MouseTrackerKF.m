@@ -29,7 +29,7 @@ classdef MouseTrackerKF < MouseTracker
             % All of the proper initialization is done in the MouseTracker object this is inherited from
             this = this@MouseTracker(varargin{:});
             this.blobID = NaN*zeros(size(this.areas)); %implementing a unique ID assigment for each blob to facilitate assignment
-%            
+            
         end %function MouseTrackerKF
         % ------------------------------------------------------------------------------------------------------
         function initKalmanFilter(this)
@@ -218,10 +218,14 @@ classdef MouseTrackerKF < MouseTracker
             for ii=1:length(frames)
                 fi = frames(ii);
                 if ~isnan(this.noseblob(fi))
+                    np = this.nosePos(fi,:);
                     %line('Parent', ah, 'Xdata', this.areas(fi,this.noseblob(fi)).Centroid(1), 'Ydata', ...
                     %    this.areas(fi,this.noseblob(fi)).Centroid(2), 'Marker', '.', 'MarkerSize', 8, 'Color', plotblue);
                     line('Parent', ah, 'Xdata', this.nosePos(fi,1), 'Ydata', ...
                         this.nosePos(fi,2), 'Marker', '.', 'MarkerSize', 10, 'Color', plotblue);
+                    if(mod(ii, 50) == 0)
+                        text(np(1)+5, np(2)+5, num2str(fi));
+                    end
                     %line('Parent', ah, 'Xdata', this.nosePos(fi,1), 'Ydata', ...
                     %    this.nosePos(fi,2), 'Marker', '.', 'MarkerSize', 10, 'Color', 'w');
                 end
@@ -469,7 +473,7 @@ classdef MouseTrackerKF < MouseTracker
             centers = [this.areas(frame, :).Centroid];
             centers = reshape(centers, 2, [])';
             dist = ipdm(centers, pos);
-            if nanmin(dist) < 10
+            if nanmin(dist) < 15
                 [min_dist, disti] = nanmin(dist);
                 this.noseblob(frame) = disti;
                 this.nosePos(frame,:) = this.areas(frame,disti).Centroid;
@@ -498,8 +502,9 @@ classdef MouseTrackerKF < MouseTracker
                 segFrames = frames(first:last);
                 
                 disp(['Finding mouse in segment ' num2str(jj)]);
-                frameArray = this.readMovieSection(segFrames,'bin', this.default_thresh);
-                segFrames = segFrames(1:size(frameArray, 3));
+                [frameArray, fcLum] = this.readMovieSection(segFrames,'bin', this.default_thresh);
+                segFrames = segFrames(1:size(frameArray, 3)); % look at the return to verify it returned the correct size array
+                this.fcLum(segFrames) = fcLum; % save the frame counter area value
                 newFrameCount(jj) = this.nFrames;
                 trimmed(jj) = 0; 
                 if size(frameArray,3) < length(segFrames) %there was a problem reading some frames, so we need to adjust
@@ -518,7 +523,7 @@ classdef MouseTrackerKF < MouseTracker
                 this.trimFields(); %trim the object property arrays
             end
             this.computeVelocity(frames);
-            %this.refineTracking(frames);    
+            this.refineTracking(frames);    
         end
         
         % -----------------------------------------------------------------------------------------------
@@ -759,7 +764,7 @@ classdef MouseTrackerKF < MouseTracker
                 end
                 if maxo > .7 %nearly all non-nose blobs have zero overlap with a well defined nose
                     noseblob(ii) = maxoi;
-                elseif (this.nblobs(fi) > 3) %only works if there are enough things to track
+                elseif (this.nblobs(fi) >= 3) %only works if there are enough things to track
                     if this.tailVisible(fi) && (this.nblobs(fi) > 2)%we can only do this first method if the tail is present
                         % compute the vector from tail to body center
                         bodyVect = this.bodyCOM(fi,:) - this.areas(fi,this.tailblob(fi)).Centroid;
@@ -1718,7 +1723,7 @@ classdef MouseTrackerKF < MouseTracker
         end
         
         % ------------------------------------------------------------------------------------------------------
-        function movieArray = readMovieSection(this, frames, movieType, varargin)
+        function [movieArray, fc_val] = readMovieSection(this, frames, movieType, varargin)
         % function movieArray = readMovieSection(this, frames, movieType)
         % 
         % reads a section of movie specified by the frames list.
@@ -1728,7 +1733,7 @@ classdef MouseTrackerKF < MouseTracker
         %         varargin - a threshold value if you want to specify that for a binary movie 
             [frame_ints, flag] = this.listToIntervals(frames);
             rawArray = this.readFrames(frame_ints, flag);
-            movieArray = this.processFrameArray(rawArray, 1:length(frames), this.avgFrame, movieType, varargin{:});
+            [movieArray, ~, ~, fc_val] = this.processFrameArray(rawArray, 1:length(frames), this.avgFrame, movieType, varargin{:});
         end
         
         % ------------------------------------------------------------------------------------------------------
@@ -1770,7 +1775,7 @@ classdef MouseTrackerKF < MouseTracker
             
         end
         % ---------------------------------------------------------------------------
-        function [ret_mov, avg_frame, thresh] = processFrameArray(this, rawArray, frame_range, subFrame, movieType, varargin)
+        function [ret_mov, avg_frame, thresh, fc_val] = processFrameArray(this, rawArray, frame_range, subFrame, movieType, varargin)
             % returns a  movie using the frames specified in the input. The movie can appear different and
             % is specified with MOVIETYPE: 'orig' gives the original movie, 'diff' provides a version with a 
             % frame subtracted, by default the mean frame, 'bin' is a binary thresholded image. There is
@@ -1790,6 +1795,12 @@ classdef MouseTrackerKF < MouseTracker
             do_hpfilter = 1; %flag for highpass filtering
             alpha = .5; %The parameter for an unsharp filter - subtracts a blurred image from the image to sharpen original
             new_mov = rawArray(:,:,frame_range);
+            if ~isempty(this.fcArea) % excludes the area used for counting frames
+                fca = this.fcArea;
+                fc_mov = new_mov(fca(2):fca(4), fca(1):fca(3), :);
+                fc_val = squeeze(sum(sum(fc_mov,1),2));
+                new_mov(fca(2):fca(4), fca(1):fca(3), :) = 0;
+            end
             % make a movie from the average frame to subtract
             if ~isempty(subFrame)
                 avg_frame = subFrame;
@@ -1828,7 +1839,7 @@ classdef MouseTrackerKF < MouseTracker
                     nFrames = size(bin_mov,3);
                     for ii = 1:nFrames
                         %this is to get rid of the jagged edges due to something regarding movie compression, but also
-                        %removes one pixel around the edge of the contiguous sections of blob
+                        %removes one pixel around the edge of the contiguous sections of blmtob
                         bw = bin_mov(:,:,ii);
                         %bw = im2bw(diff_mov(:,:,ii),thresh(kk));
                         bw = imerode(bw, strel('square',erode_size)); 

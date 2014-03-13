@@ -40,6 +40,14 @@ classdef MouseTracker < handle
         regprops = {'Area', 'Centroid', 'BoundingBox','MajorAxisLength','MinorAxisLength','Orientation','Extrema','PixelIdxList','PixelList','Perimeter'};
         blobsToDelete = []; %list for debugging purposes of those blobs to delete - to mark them.
         exitMovie = 0
+        % Frame counter variables: There is a dedicated small area for a periodic LED signal driven by an external
+        % trigger (eg physiology acquision system) in order to verify that the video is properly synced, and if it 
+        % has skipped frames, to correct the error post hoc. If this is not in use, set the
+        % fcArea to empty and it'll not be utilized.
+        fcArea = [1221, 959, 1266, 999]; %position in frame, [left, top, right, bottom]
+        fcLum = []; % The actual values of the LED area - sum over the area used, normalized.
+        fcPeriod = 50; %the period of the repeating pattern, enables easy analysis of inter cyle variability
+        syncInd = []; %this is a vector of indices for each frame corresponding to an external trigger
     end
     properties (SetAccess = private)
         
@@ -541,6 +549,24 @@ classdef MouseTracker < handle
             
         end
         
+        %------------------------------- Frame Counter functions --------------------------------------
+        function setFrameCountArea(this)
+        % Brings up a selector to override the default area
+            figure;
+            imshow(this.avgFrame)
+            H = imrect;
+            pos = round(H.getPosition);
+            this.fcArea = [pos(1) pos(2) pos(1)+pos(3) pos(2)+pos(4)];
+        end
+        
+        function missing = isMissingFrame(this)
+        % Check if frame(s) is(are) missing
+            missing = 0;
+            if ~isempty(this.fcArea)
+                missing = isMissingFrame(this.fcLum, this.fcPeriod, .01); %functionality outsourced
+            end 
+        end
+        
     %end
     
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%% PRIVATE METHODS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1009,6 +1035,7 @@ classdef MouseTracker < handle
             tempareas = struct('Area',0, 'Centroid',[0 0],'BoundingBox', [0 0 0 0], 'MajorAxisLength',0,...
                 'MinorAxisLength',0, 'Orientation',0,'Extrema',[0 0 0 0], 'PixelIdxList',[], 'PixelList',[],'Perimeter', 0);
             this.areas = repmat(tempareas, this.nFrames, this.maxBlobs); % make a struct arraay length of nFrames
+            this.fcLum = zeros(this.nFrames, 1); 
         end
         
         % ------------------------------------------------------------------------------------------------------
@@ -1518,7 +1545,7 @@ classdef MouseTracker < handle
         %         varargin - a threshold value if you want to specify that for a binary movie 
             [frame_ints, flag] = this.listToIntervals(frames);
             rawArray = this.readFrames(frame_ints, flag);
-            movieArray = this.processFrameArray(rawArray, 1:length(frames), this.avgFrame, movieType, varargin);
+            movieArray  = this.processFrameArray(rawArray, 1:length(frames), this.avgFrame, movieType, varargin);
         end
         
         % ------------------------------------------------------------------------------------------------------
