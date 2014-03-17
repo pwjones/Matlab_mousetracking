@@ -5,8 +5,6 @@ classdef MouseTrackerKF < MouseTracker
         p_mouse = .0008; %the proportion of pixels that are 
         kf = struct('nstates', {}, 'nob', {}, 's', {});
         mm_conv = 1.16; %mm/px linear
-        blob_num = 1;
-        blobID = [];
     end
     
     methods
@@ -605,57 +603,7 @@ classdef MouseTrackerKF < MouseTracker
             end
         end
         
-        % ------------------------------------------------------------------------------------------------------
-        function assignBlobIDs(this, frame)
-            % Assigns unique IDs to blobs based on their overlap with past blobs.  If you have a >30% overlap, you are assumed to 
-            % be the same blob and therefore get teh same identifier.  If you don't, you get a new one.  
-            % Some parameters for assignment:
-            FTF_OL = .5; % The frame-to-frame overlap to be called the same area
-            LOW_OL = .3; % A lower overlap threshold for determining merging
-            MAX_DIST = 7;% The maximum distance to spots can be to autmatically be given same ID.
-            
-            fi = frame;
-            if (frame ~= 1)
-                prev = this.areas(frame-1, 1:this.nblobs(fi-1));
-                matched = zeros(this.nblobs(frame),1); %does each blob have a prev frame match - if so which
-                for ii = 1:this.nblobs(fi)
-                    blob = this.areas(frame, ii);
-                    if ~isempty(prev) %if there were blobs on the last frame, checked to avoid error
-                        overlap = regionOverlap(blob, prev, this.regprops);
-                        oli = find(overlap >= LOW_OL);
-                        ol_vals = overlap(oli); %overlap values
-                        if length(oli > 1) % Sort in descending overlapping-ness
-                            [ol_vals, sorti] = sort(ol_vals(:), 1, 'descend');
-                            oli = oli(sorti);
-                        end
-                        prev_pos = reshape([prev(oli).Centroid], 2,[])';
-                        com_dist = NaN*zeros(size(prev_pos,1),2);
-                        for jj=1:size(prev_pos,1) com_dist(jj,:) = blob.Centroid - prev_pos(jj,:); end
-                        com_dist = sqrt(sum(com_dist.^2, 2));
-                        % loop through overlapping blobs in prev frames, looking for the best qualified one
-                        % that isn't taken.
-                        for jj = 1:length(oli)
-                            if ol_vals(jj) > FTF_OL || com_dist(jj) < MAX_DIST % test if they are similar enough to be considered same
-                                if sum(matched == oli(jj))<1 % is that ID already in this frame?
-                                    matched(ii) = oli(jj);
-                                end
-                            end
-                        end
-                    end
-                    if matched(ii)
-                        this.blobID(frame, ii) = this.blobID(frame-1, matched(ii));
-                    else 
-                        this.blobID(frame, ii) = this.blob_num;
-                        this.blob_num = this.blob_num+1;
-                    end
-                end
-            else
-                for ii = 1:this.nblobs(fi)
-                    this.blobID(frame, ii) = this.blob_num;
-                    this.blob_num = this.blob_num+1;
-                end
-            end
-        end
+        
         
         % ------------------------------------------------------------------------------------------------------
         function newPos = correctDetection(this, frame, detectedPos, predictedPos)
