@@ -1091,6 +1091,8 @@ classdef MouseTracker < handle
                 'MinorAxisLength',0, 'Orientation',0,'Extrema',[0 0 0 0], 'PixelIdxList',[], 'PixelList',[],'Perimeter', 0);
             this.areas = repmat(tempareas, this.nFrames, this.maxBlobs); % make a struct arraay length of nFrames
             this.fcLum = zeros(this.nFrames, 1); 
+            this.blobID = NaN*zeros(this.nFrames, this.maxBlobs);
+            this.blob_num = 1;
         end
         
         % ------------------------------------------------------------------------------------------------------

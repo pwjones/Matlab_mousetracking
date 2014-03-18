@@ -26,7 +26,7 @@ classdef MouseTrackerKF < MouseTracker
             
             % All of the proper initialization is done in the MouseTracker object this is inherited from
             this = this@MouseTracker(varargin{:});
-            this.blobID = NaN*zeros(size(this.areas)); %implementing a unique ID assigment for each blob to facilitate assignment
+            %this.blobID = NaN*zeros(size(this.areas)); %implementing a unique ID assigment for each blob to facilitate assignment
             
         end %function MouseTrackerKF
         % ------------------------------------------------------------------------------------------------------
