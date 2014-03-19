@@ -557,6 +557,7 @@ classdef MouseTrackerKF < MouseTracker
                     this.detectTail(fi);
                     this.bodyCOM(fi,:) = this.computeBodyPos(fi,1); % 1) get the center of mass of animal
                     [this.nosePos(fi,:), this.noseblob(fi)] = this.findNose(fi); % 2) get the nose blob
+                    % Kalman filter stuff -----------------
                     s = this.kf.s(fi); % 3) compare to prediction
                     pred_x = s.x(1:2)';
                     if( fi == 1) %if first frame, make sure that things are good
@@ -570,6 +571,8 @@ classdef MouseTrackerKF < MouseTracker
                             this.correctDetection(fi, this.nosePos(fi,:), pred_x);
                         end
                     end
+                    % End Kalman Filter Stuff ---------------
+                    
                     % just update the filter with the proper z in order to predict next frame
                     if fi>1 %compute frame-by-frame velocities
                         this.bodyVel(fi, :) = this.bodyCOM(fi,:) - this.bodyCOM(fi,:);
@@ -582,11 +585,13 @@ classdef MouseTrackerKF < MouseTracker
                     else
                         vel = [0 0];
                     end
+                    % More Kalman Filter ------------------
                     this.kf.s(fi).z = [this.nosePos(fi,:) vel]';
                     % 5) make prediction for next frame
                     if fi < this.nFrames
                         this.kf.s(fi+1) = kalmanf(this.kf.s(fi));
                     end
+                    % End -------------------------
                     if dbg %debug plotting
                         bin_im = zeros(this.height, this.width);
                         for kk=1:length(temp_reg)
@@ -744,8 +749,12 @@ classdef MouseTrackerKF < MouseTracker
         
         % ------------------------------------------------------------------------------------------------------
         function bodyCOM = computeBodyPos(this, frames, includeTail)
-            %
-            if isempty(includeTail) includeTail=0; end
+        % function bodyCOM = computeBodyPos(this, frames, includeTail)
+        % 
+        % Compute the tracked body's Center of Mass
+            if isempty(includeTail) 
+                includeTail=0; 
+            end
             bodyCOM = NaN*zeros(length(frames), 2);
             for i = 1:length(frames)
                 fi = frames(i);
@@ -758,8 +767,12 @@ classdef MouseTrackerKF < MouseTracker
                     positions = permute(reshape([temp_areas(j).Centroid], 2,[]), [3 1 2]);
                     this.COM(fi, :, j) = positions;
                     if (includeTail) || (j ~= taili) %exclude the tail in the body position calculation
-                        %temp_pos = cat(1, temp_pos, temp_areas(j).PixelList);
-                        temp_pos = cat(1, temp_pos, positions);
+                        if j == 1
+                            temp_pos = temp_areas(j).PixelList;
+                        else
+                            temp_pos = cat(1, temp_pos, temp_areas(j).PixelList);
+                        end
+                        %temp_pos = cat(1, temp_pos, positions);
                         
                         %this.orient(fi, j) = [this.areas(fi,j).Orientation]./ 180 * pi; %this is the rough estimate
                     end
