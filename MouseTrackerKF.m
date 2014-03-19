@@ -171,11 +171,14 @@ classdef MouseTrackerKF < MouseTracker
             ylim([0 this.height]);
             for ii=1:length(frames)
                 fi = frames(ii);
-                if ~isnan(this.noseblob(fi))
-                    % So, this way we can't plot a solid line.
-                    line('Parent', ah, 'Xdata', this.nosePos(fi,1), 'Ydata', this.nosePos(fi,2), ...
+                line('Parent', ah, 'Xdata', this.bodyCOM(fi,1), 'Ydata', this.bodyCOM(fi,2), ...
                         'Marker', '.','MarkerSize', 8, 'Color', c);
-                end
+%                 if ~isnan(this.noseblob(fi))
+%                     %So, this way we can't plot a solid line.
+%                     line('Parent', ah, 'Xdata', this.nosePos(fi,1), 'Ydata', this.nosePos(fi,2), ...
+%                        'Marker', '.','MarkerSize', 8, 'Color', c);
+%                     
+%                 end
             end 
         end
         % ------------------------------------------------------------------------------------------------------
@@ -1087,13 +1090,13 @@ classdef MouseTrackerKF < MouseTracker
             this.paths = [];
         end
         % ------------------------------------------------------------------------------------------------------ 
-        function detectPaths(this, time, absoluteTime, useAvgFrame)
+        function detectPaths(this, time, absoluteTime, useAvgFrame, imAx)
             % Essentially just calls detectEdgesInFrame twice, once for
             % each path, and saves the results
             pb = 0;
             
-            [this.paths, rew_image] = detectEdgesInFrame(this, time, absoluteTime, useAvgFrame);
-            [this.paths(2), distract_image] = detectEdgesInFrame(this, time, absoluteTime, useAvgFrame);
+            [this.paths, rew_image] = detectEdgesInFrame(this, time, absoluteTime, useAvgFrame, imAx);
+            [this.paths(2), distract_image] = detectEdgesInFrame(this, time, absoluteTime, useAvgFrame, imAx);
             
             if (pb)
                 order = [2 1 3];
@@ -1108,13 +1111,13 @@ classdef MouseTrackerKF < MouseTracker
             
         end
          % ------------------------------------------------------------------------------------------------------ 
-        function detectRefinePaths(this,time,absoluteTime,useAvgFrame)
-            this.detectPaths(time, absoluteTime, useAvgFrame);
+        function detectRefinePaths(this,time,absoluteTime,useAvgFrame, imAx)
+            this.detectPaths(time, absoluteTime, useAvgFrame, imAx);
             this.refinePaths(1);
             this.refinePaths(2);
         end
         % ------------------------------------------------------------------------------------------------------
-        function [e, eimage] = detectEdgesInFrame(this, time, absoluteTime, useAvgFrame)
+        function [e, eimage] = detectEdgesInFrame(this, time, absoluteTime, useAvgFrame, imAx)
             % function e = detectEdgesInFrame(this, time, absoluteTime)
             %
             % Detects the edges within an movie frame. This is the MouseTracker object, time is the time during the
@@ -1145,9 +1148,14 @@ classdef MouseTrackerKF < MouseTracker
             gf = imadjust(gf, [mingf/255; maxgf/255], [0; 1]);
             
             % get user input about which lines they want to be marked
-            fh = figure; imshow(gf);
-            [cx, cy] = ginput; %get 2 points from user interaction
-            close(fh);
+            if isempty(imAx)
+                fh = figure; imshow(gf);
+                [cx, cy] = ginput; %get 2 points from user interaction
+                close(fh);
+            else
+                axes(imAx); imshow(gf);
+                [cx, cy] = ginput; 
+            end
             
             [ei, thresh] = edge(gf, 'canny'); %first detect edges
             %thresh(1) = .8*thresh(2); %inefficient, to detect twice, but I want to adjust the thresh
@@ -1739,6 +1747,7 @@ classdef MouseTrackerKF < MouseTracker
             %Image Processing Settings
             %thresh(1) = .1; % the threshold level
             p_mouse = .0007; %the prior probability of a mouse pixel.  Influences the threshold.
+            p_mouse = .01;
             erode_size = 3; %the size of erosion mask
             do_hpfilter = 1; %flag for highpass filtering
             alpha = .5; %The parameter for an unsharp filter - subtracts a blurred image from the image to sharpen original
@@ -1748,6 +1757,8 @@ classdef MouseTrackerKF < MouseTracker
                 fc_mov = new_mov(fca(2):fca(4), fca(1):fca(3), :);
                 fc_val = squeeze(sum(sum(fc_mov,1),2));
                 new_mov(fca(2):fca(4), fca(1):fca(3), :) = 0;
+            else
+                fc_val = NaN*ones(length(frame_range), 1);
             end
             % make a movie from the average frame to subtract
             if ~isempty(subFrame)
@@ -1756,8 +1767,8 @@ classdef MouseTrackerKF < MouseTracker
                 avg_frame = uint8(round(mean(new_mov,3)));
             end
             avg_mov = uint8(repmat(avg_frame, [1 1 size(new_mov,3)]));
-            %diff_mov = imabsdiff(new_mov, avg_mov); %this should give a nice moving blob.
-            diff_mov = new_mov - avg_mov; %this should give a nice moving blob.
+            diff_mov = imabsdiff(new_mov, avg_mov); %this should give a nice moving blob.
+            %diff_mov = new_mov - avg_mov; %this should give a nice moving blob.
             if do_hpfilter
                 h = fspecial('unsharp', alpha);
                 diff_mov = imfilter(diff_mov, alpha);

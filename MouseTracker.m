@@ -118,8 +118,10 @@ classdef MouseTracker < handle
                 %vid_struct = mmread(this.videoFN, 1); 
                 %vid_struct = vid_struct(1); %sometimes returning as array.  Weird.
                 this.frameRate = this.readerObj.FrameRate;
+                this.fcPeriod = this.frameRate; %as a default, the light will cycle every sec
                 this.nativeWidth = this.readerObj.Width;
                 this.nativeHeight = this.readerObj.Height;
+                
 
                 if (nargin > 3) %there is a crop vector present
                     this.crop = varargin{4};
@@ -154,7 +156,7 @@ classdef MouseTracker < handle
                 %vid_struct = mmread(this.videoFN, avgRange);     
                 %vid_struct = this.convertToGray(vid_struct);
                 avgRange = 1:this.avgSubsample:length(this.frameRange);
-                while (length(avgRange) < 20)
+                while (length(avgRange) < 40)
                     this.avgSubsample = floor(this.avgSubsample/2);
                     avgRange = 1:this.avgSubsample:length(this.frameRange);
                 end
@@ -1681,8 +1683,8 @@ classdef MouseTracker < handle
                 avg_frame = uint8(round(mean(new_mov,3)));
             end
             avg_mov = uint8(repmat(avg_frame, [1 1 size(new_mov,3)]));
-            %diff_mov = imabsdiff(new_mov, avg_mov); %this should give a nice moving blob.
-            diff_mov = new_mov - avg_mov; %this should give a nice moving blob.
+            diff_mov = imabsdiff(new_mov, avg_mov); %this should give a nice moving blob.
+            %diff_mov = new_mov - avg_mov; %this should give a nice moving blob.
             if(boostContrast)
                 diff_mov = increaseMovContrast(diff_mov);
             end
