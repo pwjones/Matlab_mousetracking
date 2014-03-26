@@ -120,7 +120,7 @@ classdef MouseTracker < handle
                 this.frameRate = this.readerObj.FrameRate;
                 this.nativeWidth = this.readerObj.Width;
                 this.nativeHeight = this.readerObj.Height;
-
+                this.fcPeriod = round(this.frameRate);
                 if (nargin > 3) %there is a crop vector present
                     this.crop = varargin{4};
                     this.width = this.readerObj.width - sum(this.crop(1:2));
