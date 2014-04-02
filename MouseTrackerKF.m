@@ -104,6 +104,7 @@ classdef MouseTrackerKF < MouseTracker
         % 1) 'nose' or 'body' for different velocities.  Nose is default.
         % 2) Gaussian filter length in samples - the velocity can be noisy, which can interfere with
         %    its visualization.  Filtering to reduce extremes.  Default is 1, the std in samples.
+            mm_conv = 1.16; %mm/px linear
             
             %input parsing/checking
             if ~exist('frames', 'var') || isempty(frames); frames = 1:this.nFrames; end
@@ -124,7 +125,8 @@ classdef MouseTrackerKF < MouseTracker
                 vel_vect = this.bodyVel(frames,:);
                 vel_vect = sqrt(sum(vel_vect.^2,2));
             end
-            vel_vect = gaussianFilter(vel_vect, filt_std, 'conv2');
+            vel_vect = gaussianFilter(vel_vect, filt_std, 'conv');
+            vel_vect = mm_conv * this.frameRate * vel_vect;  %convert to mm/sec
             [cm cinds] = getIndexedColors('jet', vel_vect, 0);
             
             % unfortunately, I haven't been able to figure out an easier way to do colormapping of points plotted over
@@ -147,7 +149,7 @@ classdef MouseTrackerKF < MouseTracker
             %ah2 = axes('position', [.1 .1 .7 .8], 'visible', 'off');
             colormap(cm);
             %axes(ah2);
-            pcolor([this.vel(frames,1), this.vel(frames,1)]);
+            pcolor([vel_vect(frames,1), vel_vect(frames,1)]);
             %line('parent', ah2, 'ydata', sorted_dir, 'xdata', 1:length(sorted_dir)); 
             colorbar;
         end
@@ -293,7 +295,6 @@ classdef MouseTrackerKF < MouseTracker
             if ~exist('frames', 'var') || isempty(frames); frames = 1:this.nFrames; end
             fh = figure;
             ah = axes('position', [.1, .1, .7 .8]);
-            cm = colormap(hsv(this.nFrames));
             sorted_dir = sort(this.direction); %sorted vector for colormapping
             [cm cinds] = getIndexedColors('jet', this.direction(frames), 1);
             bgIm = this.plotPathsOnBg();
@@ -374,31 +375,34 @@ classdef MouseTrackerKF < MouseTracker
         function plotOrientation(this, frames)
             % function plotOrientation(this, frames)
             if ~exist('frames', 'var') || isempty(frames); frames = 1:this.nFrames; end
+            orient = this.headingFromBodyToNose(frames);
+            cm_vals = linspace(-pi,pi,128);
+            [cm, ~, cvals] = getIndexedColors('colormapc', cm_vals, 0);
+            cinds = zeros(size(orient))*NaN;
+            for ii=1:length(orient)
+                dif = abs(cvals - orient(ii));
+                [~, di] = min(dif);
+                if ~isnan(di)
+                    cinds(ii) = di;
+                end
+            end
             figure;
-            cm = colormap(hsv(this.nFrames));
-            sorted_orient = sort(this.bodyOrient); %sorted vector of speeds for colormapping
-            imshow(this.avgFrame); hold on;
-            xlim([0 this.width]);
+            imshow(this.plotPathsOnBg()); hold on;
+            xlim([0 this.width]); %fit the axes to the image
             ylim([0 this.height]);
-            % unfortunately, I haven't been able to figure out an easier way to do colormapping of points plotted over
-            % a B&W image, without the points and the image sharing the same colormap.  So, here I'm just plotting every
-            % point separately, with a color indicative of the velocity of the animal.
             for ii=1:length(frames)
                 fi = frames(ii);
-                ci = find(sorted_orient == this.bodyOrient(fi), 1, 'first');
-                if ~isnan(ci)
-                    %line('Xdata', this.COM(ii,1), 'Ydata', this.COM(ii,2), 'Marker', '.', 'MarkerSize', 10, 'Color', cm(ci,:));
-                    line('Xdata', this.nosePos(fi,1), 'Ydata', this.nosePos(fi,2), 'Marker', '.', 'MarkerSize', 10, 'Color', cm(ci,:));
+                %ci = find(sorted_orient == this.bodyOrient(fi), 1, 'first');
+                if ~isnan(orient(ii))
+                    line('Xdata', this.nosePos(fi,1), 'Ydata', this.nosePos(fi,2), 'Marker', '.', 'MarkerSize', 10, 'Color', cm(cinds(ii),:));
                 end
             end 
+            title(this.videoFN);
             % Make another graph with the color scale
             fh2 = figure;
-            ah2 = axes('position', [.1 .1 .7 .8], 'visible', 'off');
-            cm = colormap(hsv(this.nFrames));
-            axes(ah2);
-            pcolor(repmat(sorted_orient(:), [1 3]));
-            %line('parent', ah2, 'ydata', sorted_dir, 'xdata', 1:length(sorted_dir)); 
-            colorbar;
+            ah2 = axes('position', [.1 .1 .7 .8]);
+            makeCircColorbar(0,cm,cvals,0);
+            set(gca, 'XDir', 'reverse')
         end
         
         % ------------------------------------------------------------------------------------------------------

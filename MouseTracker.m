@@ -1078,6 +1078,8 @@ classdef MouseTracker < handle
             this.COM = NaN*zeros(this.nFrames, 2, this.maxBlobs);
             this.orient = NaN*zeros(this.nFrames, this.maxBlobs);
             this.vel = NaN*zeros(this.nFrames, this.maxBlobs);
+            %this.noseVel = NaN*zeros(this.nFrames,1);
+            %this.bodyVel = NaN*zeros(this.nFrames,1);
             this.direction = NaN*zeros(this.nFrames, this.maxBlobs);
             this.tailVisible = zeros(this.nFrames, 1);
             this.nosePos = NaN*zeros(this.nFrames, 2); %nose position

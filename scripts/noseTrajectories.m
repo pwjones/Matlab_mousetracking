@@ -4,7 +4,7 @@ function [nose_traj, dirs, wind] = noseTrajectories(mt)
 % Want to try to look at the nose trajectories for when the animal is tracking the trail.
 % Basically, want to look at the lateral distance from the trail after when the animal sweeps 
 % left->right or right->left.
-pb = 0;
+pb = 1;
 [crossings, dirs] = mt.findTrailCrossings([],1); %finds the crossings and their directions
 % let's plot them on the trail for sanity check
 if pb
