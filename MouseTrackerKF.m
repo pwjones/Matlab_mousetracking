@@ -5,6 +5,7 @@ classdef MouseTrackerKF < MouseTracker
         p_mouse = .0008; %the proportion of pixels that are 
         kf = struct('nstates', {}, 'nob', {}, 's', {});
         mm_conv = 1.16; %mm/px linear
+        fullPaths;
     end
     
     methods
@@ -1148,6 +1149,26 @@ classdef MouseTrackerKF < MouseTracker
             this.refinePaths(1);
             this.refinePaths(2);
         end
+        
+         % ------------------------------------------------------------------------------------------------------ 
+        function makePathsSkel(this)
+            if ~isempty(this.fullPaths)
+                this.fullPaths = this.paths;
+            end
+            for ii = 1:length(this.paths)
+                this.paths(ii) = skeletonizePath(this.paths(ii), this.width, this.height);
+            end
+        end
+         % ------------------------------------------------------------------------------------------------------ 
+        function makePathsFull(this)
+            if ~isempty(this.fullPaths)
+                this.paths = this.fullPaths;
+                this.fullPaths = [];
+            else
+                disp('There is no fullPaths field.');
+            end
+        end
+        
         % ------------------------------------------------------------------------------------------------------
         function [e, eimage] = detectEdgesInFrame(this, time, absoluteTime, useAvgFrame, imAx)
             % function e = detectEdgesInFrame(this, time, absoluteTime)
@@ -1258,18 +1279,20 @@ classdef MouseTrackerKF < MouseTracker
             color_order = [2 1 3];
             for ii = 1:length(pathNums)
                 %set color layer to 255
-                pi = pathNums(ii);
+                pi = pathNums(ii); 
                 c = color_order(mod(pi-1, 3)+1);
                 layer = pathIm(:,:,c);
-                layer(this.paths(pi).PixelIdxList) = 255;
+                path = this.paths(pi);
+                %path = skeletonizePath(path, this.width, this.height);
+                layer(path.PixelIdxList) = 255;
                 pathIm(:,:,c) = layer;
                 oc = find(1:3 ~= c);
                 %set the other layers to 0
                 layer = pathIm(:,:,oc(1));
-                layer(this.paths(pi).PixelIdxList) = 0;
+                layer(path.PixelIdxList) = 0;
                 pathIm(:,:,oc(1)) = layer;
                 layer = pathIm(:,:,oc(2));
-                layer(this.paths(pi).PixelIdxList) = 0;
+                layer(path.PixelIdxList) = 0;
                 pathIm(:,:,oc(2)) = layer;
             end
         end
@@ -1394,7 +1417,7 @@ classdef MouseTrackerKF < MouseTracker
             %rotations = mod(headingTheta - orthoTheta, 2*pi);
             %negi = rotations > pi;
             dists = noseDist;
-            distds = dists .* rotations; %gives it a sign
+            dists = dists .* rotations; %gives it a sign
             %dists(negi) = -1*dists(negi); %switch the sign of some
             
         end
@@ -1405,7 +1428,7 @@ classdef MouseTrackerKF < MouseTracker
         %
         % This is the best function in the world. Finds trail crossings, and tells you the direction of
         % each.  From left->right is positive, from right->left is negative.
-            dist_thresh = 5;
+            dist_thresh = 3;
             dists = this.orthogonalDistFromTrail(frames, pathNum);
             s1 = dists(1:end-1);
             s2 = dists(2:end);

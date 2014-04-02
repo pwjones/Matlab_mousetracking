@@ -189,7 +189,7 @@ end
  %% Plot position/velocity for videos
  fh = figure;
  for ii =1:length(exp.vids)
-     exp.vids(ii).plotVelocity([],'nose', 0);
+     exp.vids(ii).plotVelocity([],'nose', 2);
      
      figure(fh);
      subplot (3, ceil(length(exp.vids)/3), ii);
@@ -200,5 +200,12 @@ end
      ylabel('Nose Velocity');
  end
  
- 
+ %%
+ for ii =1:length(exp.vids)
+     exp.vids(ii).makePathsSkel;
+ end
+ %%
+ for ii =1:length(exp.vids)
+     exp.vids(ii).plotOrientation([]);
+ end
  
