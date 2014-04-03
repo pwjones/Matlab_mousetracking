@@ -66,6 +66,7 @@ for ii = 1:nfiles
     % and that we are calling the constructor function to load it. 
     %mt = class_func(fullname, [],[starts(ii) ends(ii)]); 
     mt = class_func(fullname, [],[]); 
+    mt.makePathsSkel();
 %    mt.plotFollowing([], following_thresh, 0);
     rew_prop(ii) = mt.propTimeOnTrail([],1,following_thresh);
     dist_prop(ii) = mt.propTimeOnTrail([],2,following_thresh);

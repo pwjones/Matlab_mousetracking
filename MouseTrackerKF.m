@@ -1428,7 +1428,7 @@ classdef MouseTrackerKF < MouseTracker
         %
         % This is the best function in the world. Finds trail crossings, and tells you the direction of
         % each.  From left->right is positive, from right->left is negative.
-            dist_thresh = 3;
+            dist_thresh = 5;
             dists = this.orthogonalDistFromTrail(frames, pathNum);
             s1 = dists(1:end-1);
             s2 = dists(2:end);
