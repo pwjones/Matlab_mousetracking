@@ -1,10 +1,20 @@
-function [nose_traj, dirs, wind] = noseTrajectories(mt)
+function [nose_traj, dirs, wind] = noseTrajectories(mt, varargin)
 % function [nose_traj, wind, dir] = noseTrajectories(mt)
 %
 % Want to try to look at the nose trajectories for when the animal is tracking the trail.
 % Basically, want to look at the lateral distance from the trail after when the animal sweeps 
 % left->right or right->left.
-pb = 0;
+if length(varargin) >= 1 && ~isempty(varargin{1})
+    wind = varargin{1};
+else
+    %wind = -10:20; %window for looking at the positions
+    wind = -10:30; %window for looking at the positions
+end
+if length(varargin) >= 2
+    pb = varargin{2};
+else
+    pb = 0;
+end
 [crossings, dirs] = mt.findTrailCrossings([],1); %finds the crossings and their directions
 % let's plot them on the trail for sanity check
 if pb
@@ -13,7 +23,6 @@ if pb
     plot(np(:,1), np(:,2), 'rx');
 end
 
-wind = -10:20; %window for looking at the positions
 nose_traj = NaN*zeros(length(crossings), length(wind));
 for ii = 1:length(crossings)
     cross_wind = wind+crossings(ii);

@@ -42,7 +42,9 @@ figure;
 for ii = 1:length(exp.vids)
     subplot (3, ceil(length(exp.vids)/3), ii);
     bc = exp.vids(ii).bodyCOM;
+    np = exp.vids(ii).nosePos;
     lh = plot(bc(:,1), bc(:,2)); 
+    hold on; lh2 = plot(np(:,1), np(:,2), 'g'); 
 end
 
 figure; 
@@ -86,21 +88,22 @@ for ii = 1:length(exp.resp)
     bodyVel = bodyVel(sniffFrames); bodyVel_filt = bodyVel_filt(sniffFrames);
     sniffFrames = exp.camTrig(ii).frameRange(sniffFrames); %index frames collected rather than those analysed
     freq = exp.resp(ii).sniffFreq(exp.camTrig(ii).frameInds(sniffFrames));
-    noseVel_filt = noseVel_filt ./ nanmax(noseVel_filt); %normalize
-    bodyVel_filt = bodyVel_filt ./ nanmax(bodyVel_filt); 
+    %noseVel_filt = noseVel_filt ./ nanmax(noseVel_filt); %normalize
+    %bodyVel_filt = bodyVel_filt ./ nanmax(bodyVel_filt); 
     norm_freq = freq ./ nanmax(freq);
     % unit conversions - from px/frame to mm/sec
     fps = exp.vids(ii).frameRate;
     noseVel = mm_conv * fps * noseVel; noseVel_filt = mm_conv * fps * noseVel_filt; 
     bodyVel = mm_conv * fps * bodyVel; bodyVel_filt = mm_conv * fps * bodyVel_filt; 
     % Let's try to see what things look like excluding the really low vel points
-    %moving = noseVel >= 75;
-    %freq = freq(moving); noseVel = noseVel(moving); bodyVel = bodyVel(moving);
+    moving = noseVel_filt >= 75;
+    freq = freq(moving); noseVel = noseVel(moving); bodyVel = bodyVel(moving);
+    noseVel_filt = noseVel_filt(moving);
     %correlation/fit
-    [p, S] = polyfit(noseVel, freq, 1);
-    fitx = [0 max(noseVel)];
-    fity = polyval(p, fitx);
-    r = corr(noseVel, freq);
+    %[p, S] = polyfit(noseVel, freq, 1);
+    %fitx = [0 max(noseVel)];
+    %fity = polyval(p, fitx);
+    %r = corr(noseVel, freq);
     figure(f1);
     subplot (3, ceil(length(exp.vids)/3), ii);
     plot(noseVel_filt, freq, 'bo');
@@ -122,14 +125,26 @@ for ii = 1:length(exp.resp)
     subplot(3, ceil(length(exp.vids)/3), ii);
     x = 1:length(norm_freq);
     %plot(x, noseVel_filt, 'b-', x, bodyVel_filt, 'm-', x, 50*norm_freq, 'r');
-    plot(x, noseVel_filt, 'b-', x, 50*norm_freq, 'r');
-    xlabel('Sniff Number during following'); ylabel('Velocity(mm/s) and Freq (norm. 0-50)');
+    lh = plot(x, noseVel_filt, 'b-', x, freq*3, 'r');
+    set(lh, 'LineWidth', 1);
+    xlabel('Sniff Number during following'); ylabel('Velocity(mm/s) and Freq (Hz * 3)');
 end
 
-%% Plotting respiration frequency as a color over the positions
+% just as a double check, let's do it again, plotting them each on their own timebases
+f4 = figure;
+
+
+ %% Plotting respiration frequency as a color over the positions
 ft = 1:length(exp.resp);
-%ft = 3;
+ft = 1:3
+%make a fake sniff hist to get a good, yet constant color scale
+fake_sniff = 13 + 3*randn(1000,1);
+fake_sniff = cat(1, fake_sniff, linspace(0,20,40)');
+[cm, ~, cvals] = getIndexedColors('jet', fake_sniff, 1);
+cvals(end) = 50;
+%ft = 4;
 %fr = 1:1500;
+
 for ii = ft
     fr = 1:exp.vids(ii).nFrames;
     exp.vids(ii).plotPosition(fr, [], 0, 'k', '.');
@@ -139,11 +154,13 @@ for ii = ft
     sniffFrames = exp.camTrig(ii).frameRange(sniffFrames);
     freq = exp.resp(ii).sniffFreq(exp.camTrig(ii).frameInds(sniffFrames)); 
     pos = pos(sfi, :);
-    [cm cinds] = getIndexedColors('jet', freq, 1);
     %minfreq = min(freq)
     %maxfreq = max(freq)
     for jj=1:length(freq)
-        line('Parent',gca,'Xdata',pos(jj,1),'Ydata',pos(jj,2),'Marker','.','MarkerSize',8,'Color',cm(cinds(jj),:));
+        cind = find(cvals >= freq(jj),1,'first');
+        if ~isempty(cind)
+            line('Parent',gca,'Xdata',pos(jj,1),'Ydata',pos(jj,2),'Marker','.','MarkerSize',8,'Color',cm(cind,:));
+        end
     end
     % to get the scale
     figure; colormap(cm);
@@ -188,16 +205,20 @@ end
  
  %% Plot position/velocity for videos
  fh = figure;
+ mm_conv = 1.16;
  for ii =1:length(exp.vids)
      exp.vids(ii).plotVelocity([],'nose', 2);
      
      figure(fh);
      subplot (3, ceil(length(exp.vids)/3), ii);
      nv = exp.vids(ii).noseVel;
+     nv_filt = gaussianFilter(nv, 3, 'conv');
+     nv_filt = nv_filt * mm_conv * exp.vids(ii).frameRate;
      t = exp.vids(ii).times;
-     plot(t, nv, 'b', 'LineWidth', 1);
+     plot(t, nv_filt, 'b', 'LineWidth', 1);
      xlabel('Time (sec)');
      ylabel('Nose Velocity');
+     %ylim([0 300]);
  end
  
  %%
@@ -208,4 +229,32 @@ end
  for ii =1:length(exp.vids)
      exp.vids(ii).plotOrientation([]);
  end
+ 
+ %%
+ traj = []; dir = []; wind = [-15:60];
+ for ii =1:length(exp.vids)
+    exp.vids(ii).makePathsSkel();
+    [traj_tmp, dir_tmp] = noseTrajectories(exp.vids(ii));
+    if ii == 1
+        traj = traj_tmp;
+        dir = dir_tmp;
+    else
+        traj = cat(1,traj, traj_tmp);
+        dir = cat(1, dir, dir_tmp);
+    end
+ end
+ 
+ neg = (dir==-1);
+ mean_neg_traj = nanmean(traj(neg,:));
+ pos = (dir==1);
+ mean_pos_traj = nanmean(traj(pos,:));
+ 
+ figure;
+ plot(wind, traj(neg,:), 'b'); hold on;
+ plot(wind, mean_neg_traj, 'b', 'LineWidth',2);
+ plot(wind, traj(pos,:), 'm');
+ plot(wind, mean_pos_traj, 'm','LineWidth', 2);
+ 
+ 
+ 
  

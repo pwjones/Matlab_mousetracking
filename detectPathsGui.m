@@ -88,7 +88,7 @@ handles.exp_name = folders{end};
 if iscell(handles.exp_name)
     handles.exp_name = handles.exp_name{end};
 end
-handles.vids = processVideoFolder(handles.exp_name, @MouseTrackerKF);
+handles.vids = processVideoFolder(handles.exp_name, @MouseTrackerKF, 0);
 handles.vidi = 1;
 
 handles = setVideoIndex(hObject, handles, 1);

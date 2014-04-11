@@ -1,4 +1,4 @@
-classdef MouseTracker < handle
+classdef MouseTracker < handle 
     properties
         MOUSE_SCALE = 10; % minimal size of the mouse used to exclude smaller objects - radius of mask
         MIN_SIZE_THRESH = 20; %minimal size of a binary area in pixels
@@ -133,7 +133,7 @@ classdef MouseTracker < handle
 
                 % figure out the range of frames to be considered
                 time_range = []; this.frameRange = [];
-                if (nargin > 2) %use the time range specified
+                if (nargin > 1) %use the time range specified
                     time_range = varargin{3};
                     t_offset = time_range(1);
                     fr = round((time_range)*this.frameRate + 1);

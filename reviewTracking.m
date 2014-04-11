@@ -60,7 +60,7 @@ if ~isempty(varargin)
     handles.tracker = varargin{1}; %the MouseTracker object 
     mt = handles.tracker;
 else
-    exit();
+    return;
 end
 % get the frames to zero in on
 frames = 1:mt.nFrames;

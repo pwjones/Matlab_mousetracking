@@ -52,6 +52,7 @@ rew_propFollowed = NaN*zeros(nfiles,1);
 dist_propFollowed = NaN*zeros(nfiles,1);
 dir_nums = NaN*zeros(nfiles,1);
 prev_dir_name = ''; curr_dir_num = 0;
+file_names = cell(nfiles, 1);
 
 for ii = 1:nfiles
     fullname = fullfile(base_fname, fnames{ii});
@@ -86,6 +87,7 @@ for ii = 1:nfiles
     dist_trail_area(ii) = mt.paths(2).Area * mm_conv^2;
     rew_propFollowed(ii) = mt.propTrailFollowed([], 1, 10);
     dist_propFollowed(ii) = mt.propTrailFollowed([],2,10);
+    file_names{ii} = mt.videoFN;
 end
 
 % Results
@@ -109,3 +111,4 @@ ret.dir_nums = dir_nums;
 ret.nose_trajectories = nose_trajectories;
 ret.traj_window = traj_window;
 ret.traj_dir = traj_dir;
+ret.file_names = file_names;

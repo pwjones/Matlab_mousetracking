@@ -2,6 +2,7 @@
 % Peter Jones, 9.20.2013
 
 fallCohortList; % this script contains the mouse and file names to be included in the analysis.
+%spring14CohortList;
 base_folder = VIDEO_ROOT;
 following_thresh = 20; %mm
 clear perMouseData;
@@ -19,7 +20,7 @@ else
     end
 end
 
-save 'fallCohortData_20mm_followingthresh.mat' perMouseData;
+%save 'fallCohortData_20mm_followingthresh.mat' perMouseData;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Let's Make a BUNCH OF PLOTS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% Plot the time on trail over time.
@@ -295,3 +296,19 @@ for ii = 1:nMice
     plotDistanceHistComparison(rew_free, dist_free, rew_occ, dist_occ, following_thresh, '', ah);
     axes(ah); title(mouse_names{ii});
 end
+
+%% Plot the average nose trajectories
+
+% nMice = length(perMouseData);
+% nRows = ceil(sqrt(nMice));
+% fh = figure; hold on;
+% for ii = 1:nMice
+%     traj_window = perMouseData.traj_window;
+%     nTrials = length(perMouseData(ii).noseTrajectories);
+%     pos_traj = []; neg_traj = [];
+%     for jj = 1:nTrials
+%         traj = perMouseData(ii).noseTrajectories{jj};
+%         pos = perMouseData(ii).traj_dir{jj} == 1;
+%         pos_traj = cat(pos_traj
+%     end
+% end

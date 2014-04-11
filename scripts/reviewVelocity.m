@@ -20,7 +20,7 @@ if ~isempty(matfn)
     s = matlabpool('size');
     if s==0 %check if parallel toolbox is running.  If not, just do regular for loop
         for ii = 1:length(matfn)
-            fixVelInFile(
+            %fixVelInFile(
             basename = strtok(matfn.name(ii), '.');
             vidname = [basename '.avi']; %downside: skips other types of videos
             

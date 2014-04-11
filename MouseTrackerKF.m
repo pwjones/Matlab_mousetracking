@@ -26,6 +26,12 @@ classdef MouseTrackerKF < MouseTracker
             % directory or nothing.
             
             % All of the proper initialization is done in the MouseTracker object this is inherited from
+%             disp('Initializing MouseTrackerKF');
+%             if ~exist('filename', 'var') || isempty(filename)
+%                 disp('Filename not given, exiting');
+%                 this = [];
+%                 return;
+%             end
             this = this@MouseTracker(varargin{:});
             %this.blobID = NaN*zeros(size(this.areas)); %implementing a unique ID assigment for each blob to facilitate assignment
             
@@ -839,6 +845,7 @@ classdef MouseTrackerKF < MouseTracker
             
             %in order to get a velocity for the first frame (0,0) position is assumed at frame 0 
             %this.vel = NaN*zeros(size(this.bodyCOM,1),size(this.bodyCOM,3));
+            if isempty(frames) frames=1:this.nFrames; end
             if frames(1) > 1 %compute velocity from the frame before the range to get all frames requested
                 fr = [frames(1)-1; frames(:)];
             else
@@ -1284,7 +1291,7 @@ classdef MouseTrackerKF < MouseTracker
                 layer = pathIm(:,:,c);
                 path = this.paths(pi);
                 %path = skeletonizePath(path, this.width, this.height);
-                layer(path.PixelIdxList) = 255;
+                layer(path.PixelIdxList) = 200;
                 pathIm(:,:,c) = layer;
                 oc = find(1:3 ~= c);
                 %set the other layers to 0
@@ -1686,7 +1693,7 @@ classdef MouseTrackerKF < MouseTracker
                     pi = pathNums(ii);
                     c = color_order(mod(pi-1, 3)+1);
                     layer = pathIm(:,:,c);
-                    layer(this.paths(pi).PixelIdxList) = 255;
+                    layer(this.paths(pi).PixelIdxList) = 200;
                     pathIm(:,:,c) = layer;
                     oc = find(1:3 ~= c);
                     %set the other layers to 0
