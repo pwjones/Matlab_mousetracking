@@ -1159,7 +1159,7 @@ classdef MouseTrackerKF < MouseTracker
         
          % ------------------------------------------------------------------------------------------------------ 
         function makePathsSkel(this)
-            if ~isempty(this.fullPaths)
+            if isempty(this.fullPaths)
                 this.fullPaths = this.paths;
             end
             for ii = 1:length(this.paths)

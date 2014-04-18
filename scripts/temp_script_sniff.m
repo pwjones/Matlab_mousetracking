@@ -113,7 +113,9 @@ for ii = 1:length(exp.resp)
     %xlim([0 400]); ylim([5 Inf]);
     xlabel('Vel (mm/sec)'); ylabel('Sniff freq (Hz)');
     lg_str = {'Nose Vel', 'Body Vel'};
+    set(gca, 'TickDir', 'out');
     legend(lg_str, 'Location', 'SouthEast');
+    
     
     figure(f2);
     subplot(3, ceil(length(exp.vids)/3), ii);
@@ -255,6 +257,18 @@ end
  plot(wind, traj(pos,:), 'm');
  plot(wind, mean_pos_traj, 'm','LineWidth', 2);
  
+ %% 
+ for ii=1:length(exp.resp)
+    figure;
+    sniff = exp.resp(ii).value;
+    sniff = sniff-mean(sniff);
+    sniff = sniff./max(sniff);
+    plot(exp.resp(ii).time, sniff*2+20, 'k');
+    hold on;
+    plot(exp.resp(ii).time, exp.resp(ii).sniffFreq, 'r');
+ end
  
- 
+    
+     
+     
  

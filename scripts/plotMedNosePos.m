@@ -6,14 +6,14 @@
 % perMouseData is present and has multiple mice
 following_thresh = 20;
 mm_conv = 1.16; %mm/px conversion
-mouse_names = {'16220', '16221', '16227', '16231', '3090', '3091'};
-%mouse_names = {'16220', '16221', '16227', '16231'};
-train_trials = {1:72, 1:76, 1:73, 1:74, 1:35, 1:70};
-ctl_trials = {42:72, 46:76, 43:73, 44:74, 35:67, 70:100};
-occr_trials = {[], 77:107, 74:111, 75:104, 16:34, 101:138}; %each cell is a mouse
-occl_trials = {73:103, [], [], [], 68:94, 193:212};
-ctl2_trials = {[], [], [], [], [], []};
-nMice = length(perMouseData);
+% mouse_names = {'16220', '16221', '16227', '16231', '3090', '3091'};
+% %mouse_names = {'16220', '16221', '16227', '16231'};
+% train_trials = {1:72, 1:76, 1:73, 1:74, 1:35, 1:70};
+% ctl_trials = {42:72, 46:76, 43:73, 44:74, 35:67, 70:100};
+% occr_trials = {[], 77:107, 74:111, 75:104, 16:34, 101:138}; %each cell is a mouse
+% occl_trials = {73:103, [], [], [], 68:94, 193:212};
+% ctl2_trials = {[], [], [], [], [], []};
+% nMice = length(perMouseData);
 
 fh = figure; hold on;
 % want to compile the median nose distance from trail while following
