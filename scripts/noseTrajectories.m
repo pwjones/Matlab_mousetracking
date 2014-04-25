@@ -1,4 +1,4 @@
-function [nose_traj, dirs, wind] = noseTrajectories(mt, varargin)
+function [nose_traj, dirs, wind, crossingInds] = noseTrajectories(mt, varargin)
 % function [nose_traj, wind, dir] = noseTrajectories(mt)
 %
 % Want to try to look at the nose trajectories for when the animal is tracking the trail.
@@ -16,6 +16,7 @@ else
     pb = 0;
 end
 [crossings, dirs] = mt.findTrailCrossings([],1); %finds the crossings and their directions
+crossingInds = crossings;
 % let's plot them on the trail for sanity check
 if pb
     mt.plotPosition([]);
