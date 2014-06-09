@@ -1294,7 +1294,7 @@ classdef MouseTrackerKF < MouseTracker
                 layer(path.PixelIdxList) = 200;
                 pathIm(:,:,c) = layer;
                 oc = find(1:3 ~= c);
-                %set the other layers to 0
+                %set the other layervidss to 0
                 layer = pathIm(:,:,oc(1));
                 layer(path.PixelIdxList) = 0;
                 pathIm(:,:,oc(1)) = layer;
@@ -1430,11 +1430,15 @@ classdef MouseTrackerKF < MouseTracker
         end
         
         % ------------------------------------------------------------------------------------------------------
-        function [crossings, dir, dists] = findTrailCrossings(this, frames, pathNum)
+        function [crossings, dir, dists] = findTrailCrossings(this, frames, pathNum, varargin)
         % function [crossings, dir] = findTrailCrossings(this, frames, pathNum)
         %
         % This is the best function in the world. Finds trail crossings, and tells you the direction of
-        % each.  From left->right is positive, from right->left is negative.
+        % each.  From left->right is positive, from right->left is negative. 
+        % Varargin provides additional functionality if you want to oversample the signal to get a more
+        % precise time of crossing. t is that time.
+        %
+        % THIS MAY NOT WORK AS EXPECTED IF NOT CALLED WITH A CONTINUOUS SET OF FRAMES
             dist_thresh = 5;
             dists = this.orthogonalDistFromTrail(frames, pathNum);
             s1 = dists(1:end-1);
@@ -1447,6 +1451,7 @@ classdef MouseTrackerKF < MouseTracker
             crossings = crossings(ci);
             dir = dists(crossings) < 0;
             dists = dists(crossings);
+              
         end    
         
         % ------------------------------------------------------------------------------------------------------

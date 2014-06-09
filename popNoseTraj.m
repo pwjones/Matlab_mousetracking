@@ -1,10 +1,17 @@
-% plotPopulationNoseTrajectories
-%
+function ah = popNoseTraj(mouseData, main_ah)
+% function ah = popNoseTraj(mouseData)
+% 
+% Given a data structure from multiple trials (mouseData) this function will plot the 
+% averaged nose trajectory during following episodes, with all of the curves on the same
+% axis.  
 
+if (isempty(main))
+    figure;
+    main_ah = axes('Position', [.1 .1 .6 .8]);
+end
 
-%for ii = 1:length(perMouseData)
-for ii = 4:6
-    winlen = length(perMouseData(ii).traj_window);
+for ii = 1:length(mouseData)
+    winlen = length(mouseData(ii).traj_window);
     ctl_traj = []; ctl_dir = []; run_means_ctl = [];
     occr_traj = []; occr_dir = []; run_means_occr = [];
     occl_traj = []; occl_dir = []; run_means_occl = [];
@@ -12,21 +19,21 @@ for ii = 4:6
     
     tnums = ctl_trials{ii};
     for jj=1:length(tnums)
-        ctl_traj = cat(1, ctl_traj, perMouseData(ii).nose_trajectories{tnums(jj)});
-        ctl_dir = cat(1, ctl_dir, perMouseData(ii).traj_dir{tnums(jj)});
+        ctl_traj = cat(1, ctl_traj, mouseData(ii).nose_trajectories{tnums(jj)});
+        ctl_dir = cat(1, ctl_dir, mouseData(ii).traj_dir{tnums(jj)});
     end
     tnums = occr_trials{ii};
     for jj=1:length(tnums)
-        occr_traj = cat(1, occr_traj, perMouseData(ii).nose_trajectories{tnums(jj)});
-        occr_dir = cat(1, occr_dir, perMouseData(ii).traj_dir{tnums(jj)});
+        occr_traj = cat(1, occr_traj, mouseData(ii).nose_trajectories{tnums(jj)});
+        occr_dir = cat(1, occr_dir, mouseData(ii).traj_dir{tnums(jj)});
     end
     tnums = occl_trials{ii};
     for jj=1:length(tnums)
-        occl_traj = cat(1, occl_traj, perMouseData(ii).nose_trajectories{tnums(jj)});
-        occl_dir = cat(1, occl_dir, perMouseData(ii).traj_dir{tnums(jj)});
+        occl_traj = cat(1, occl_traj, mouseData(ii).nose_trajectories{tnums(jj)});
+        occl_dir = cat(1, occl_dir, mouseData(ii).traj_dir{tnums(jj)});
     end
 
-    traj_window = perMouseData(ii).traj_window;
+    traj_window = mouseData(ii).traj_window;
 
     %plot some stuff
     ltr = ctl_dir > 0;
@@ -51,8 +58,8 @@ for ii = 4:6
 
     %figure out the mouse ID
     mouseID = '';
-    if ~isempty(perMouseData(ii).file_names)
-        rem = perMouseData(ii).file_names(1); s = '';
+    if ~isempty(mouseData(ii).file_names)
+        rem = mouseData(ii).file_names(1); s = '';
         while true
             [s, rem] = strtok(rem, filesep);
             if isempty(rem{1}), break; end
@@ -68,8 +75,7 @@ for ii = 4:6
     colors = {[0 0 0], [0 0 0], [1 0 0], [1 0 0], [0 0 1], [0 0 1]};
     color_order = [ 0 0 0; 0 0 0; 1 0 0; 1 0 0; 0 0 1; 0 0 1];
  
-    figure;
-    main_ah = axes('Position', [.1 .1 .6 .8]);
+   
     plot_err_poly(main_ah, traj_window, mean_ltr_ctl, std_ltr_ctl./sqrt(n_ltr), colors{1}, (colors{1}+[1 1 1])/2, 1); hold on;
     plot_err_poly(main_ah, traj_window, mean_rtl_ctl, std_rtl_ctl./sqrt(n_rtl), colors{2}, (colors{2}+[1 1 1])/2, 1); hold on;
     plot_err_poly(main_ah, traj_window, mean_ltr_occr, std_ltr_occr./sqrt(n_ltr), colors{3}, (colors{3}+[1 1 1])/2, 1); hold on;
