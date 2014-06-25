@@ -98,7 +98,7 @@ set(gca, 'TickDir', 'out');
 % Plot the CDFs
 plotEmpiricalCDF(distance_comp, .2, {[0 0 0],[1 0 1], [1 0 0], [1 0 0]}, plotOptions, cdf_ah);
 set(get(cdf_ah,'XLabel'), 'String', 'Nose distance From Trail (px)', 'FontSize', 18);
-set(get(cdf_ah,'Ylabel'), 'String', 'Cumulative Proporation of Frames', 'FontSize', 18);
+set(get(cdf_ah,'Ylabel'), 'String', 'Cumulative Proportion of Frames', 'FontSize', 18);
 set(cdf_ah, 'Tickdir', 'out', 'FontSize', 14);
 axes(cdf_ah); ylim([0 1]);
 
@@ -117,3 +117,15 @@ plot(xd(1:end-1), xd(2:end), 'k.'); hold on;
 subplot(2,2,4);
 xd = counts{2,2};
 plot(xd(1:end-1), xd(2:end), 'k.'); hold on;
+
+% Report some statistics for the distributions
+for ii = 1:prod(size(counts))
+    n = sum(counts{ii});
+    prob = cumsum(counts{ii})./n;
+    med_bin = find(prob>.5, 1, 'first');
+    med = xbins(med_bin);
+    low_bin = find(prob>.05, 1, 'first');
+    high_bin = find(prob>.95, 1, 'first');
+    disp(sprintf('For distribution %d, the median is %f, and the 5/95 percent limits are %f, %f', ...
+             ii, med, xbins(low_bin), xbins(high_bin))); 
+end

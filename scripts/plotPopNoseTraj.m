@@ -3,7 +3,7 @@
 
 
 %for ii = 1:length(perMouseData)
-for ii = 4:6
+for ii = 1:3
     winlen = length(perMouseData(ii).traj_window);
     ctl_traj = []; ctl_dir = []; run_means_ctl = [];
     occr_traj = []; occr_dir = []; run_means_occr = [];

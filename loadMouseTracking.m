@@ -79,7 +79,7 @@ for ii = 1:nfiles
     rew_dists_from_trail_persect{ii} = mt.orthogonalDistFromTrailPerSection(1:mt.nFrames,1, following_thresh) * mm_conv;
     distract_dists_from_trail_persect{ii} = mt.orthogonalDistFromTrailPerSection(1:mt.nFrames,2, following_thresh) * mm_conv;
     total_turning(ii) = mt.totalTurning(1:mt.nFrames);
-    [nose_trajectories{ii}, traj_dir{ii}, traj_window] = noseTrajectories(mt);
+    [nose_trajectories{ii}, traj_dir{ii}, traj_window] = noseTrajectories(mt, -20:40);
     % now collect a few factors about each of the movies
     total_frames(ii) = mt.nFrames;
     frame_rate(ii) = mt.frameRate;
