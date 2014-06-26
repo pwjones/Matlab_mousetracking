@@ -2,7 +2,7 @@ classdef MouseTracker < handle
     properties
         MOUSE_SCALE = 10; % minimal size of the mouse used to exclude smaller objects - radius of mask
         MIN_SIZE_THRESH = 20; %minimal size of a binary area in pixels
-        MAX_SIZE_THRESH = 1200;
+        MAX_SIZE_THRESH = 20000;
         videoFN = []; % filename of the video
         readerObj; %videoReader object 
         framesPerSeg = 150 %the # of frames read at one time

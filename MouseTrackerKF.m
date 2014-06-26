@@ -205,7 +205,9 @@ classdef MouseTrackerKF < MouseTracker
                 fi = frames(ii);
                 if ~isnan(this.noseblob(fi))
                     % So, this way we can't plot a solid line.
-                    line('Parent', ah, 'Xdata', this.nosePos(fi,1), 'Ydata', this.nosePos(fi,2), ...
+                    %line('Parent', ah, 'Xdata', this.nosePos(fi,1), 'Ydata', this.nosePos(fi,2), ...
+                    %    'Marker', '.','MarkerSize', 8, 'Color', c);
+                    line('Parent', ah, 'Xdata', this.bodyCOM(fi,1), 'Ydata', this.bodyCOM(fi,2), ...
                         'Marker', '.','MarkerSize', 8, 'Color', c);
                 end
             end 
@@ -603,7 +605,7 @@ classdef MouseTrackerKF < MouseTracker
                     % just update the filter with the proper z in order to predict next frame
                     if fi>1 %compute frame-by-frame velocities
                         this.bodyVel(fi, :) = this.bodyCOM(fi,:) - this.bodyCOM(fi,:);
-                        this.noseVel(fi, :) = this.nosePos(fi,:)-this.nosePos(fi-1,:);
+                        this.noseVel(fi, :) = sqrt(sum((this.nosePos(fi,:)-this.nosePos(fi-1,:)).^2));
                         if isnan(this.nosePos(fi-1,1))
                             vel = [0 0];
                         else
@@ -1813,7 +1815,7 @@ classdef MouseTrackerKF < MouseTracker
             
             %Image Processing Settings
             %thresh(1) = .1; % the threshold level
-            p_mouse = .0007; %the prior probability of a mouse pixel.  Influences the threshold.
+            p_mouse = .005; %the prior probability of a mouse pixel.  Influences the threshold.
             erode_size = 3; %the size of erosion mask
             do_hpfilter = 1; %flag for highpass filtering
             alpha = .5; %The parameter for an unsharp filter - subtracts a blurred image from the image to sharpen original
@@ -1833,8 +1835,8 @@ classdef MouseTrackerKF < MouseTracker
                 avg_frame = uint8(round(mean(new_mov,3)));
             end
             avg_mov = uint8(repmat(avg_frame, [1 1 size(new_mov,3)]));
-            %diff_mov = imabsdiff(new_mov, avg_mov); %this should give a nice moving blob.
-            diff_mov = new_mov - avg_mov; %this should give a nice moving blob.
+            diff_mov = imabsdiff(new_mov, avg_mov); %this should give a nice moving blob.
+            %diff_mov = new_mov - avg_mov; %this should give a nice moving blob.
             if do_hpfilter
                 h = fspecial('unsharp', alpha);
                 diff_mov = imfilter(diff_mov, alpha);
