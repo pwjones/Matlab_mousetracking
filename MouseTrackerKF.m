@@ -203,13 +203,13 @@ classdef MouseTrackerKF < MouseTracker
             ylim([0 this.height]);
             for ii=1:length(frames)
                 fi = frames(ii);
-                if ~isnan(this.noseblob(fi))
+                line('Parent', ah, 'Xdata', this.bodyCOM(fi,1), 'Ydata', this.bodyCOM(fi,2), ...
+                        'Marker', '.','MarkerSize', 8, 'Color', c);
+                %if ~isnan(this.noseblob(fi))
                     % So, this way we can't plot a solid line.
                     %line('Parent', ah, 'Xdata', this.nosePos(fi,1), 'Ydata', this.nosePos(fi,2), ...
-                    %    'Marker', '.','MarkerSize', 8, 'Color', c);
-                    line('Parent', ah, 'Xdata', this.bodyCOM(fi,1), 'Ydata', this.bodyCOM(fi,2), ...
-                        'Marker', '.','MarkerSize', 8, 'Color', c);
-                end
+                    %    'Marker', '.','MarkerSize', 8, 'Color', c);   
+                %end
             end 
         end
         % ------------------------------------------------------------------------------------------------------
@@ -223,8 +223,8 @@ classdef MouseTrackerKF < MouseTracker
             imshow(bgIm); hold on;
             xlim([0 this.width]);
             ylim([0 this.height]);
-            filt_x = [this.kf.s.x]; %the kalman filter positions
-            filt_x = filt_x(1:2,:)';
+            %filt_x = [this.kf.s.x]; %the kalman filter positions
+            %filt_x = filt_x(1:2,:)';
             for ii=1:length(frames)
                 fi = frames(ii);
                 if ~isnan(this.noseblob(fi))
@@ -589,36 +589,36 @@ classdef MouseTrackerKF < MouseTracker
                     this.detectTail(fi);
                     this.bodyCOM(fi,:) = this.computeBodyPos(fi,1); % 1) get the center of mass of animal
                     [this.nosePos(fi,:), this.noseblob(fi)] = this.findNose(fi); % 2) get the nose blob
-                    s = this.kf.s(fi); % 3) compare to prediction
-                    pred_x = s.x(1:2)';
+                    %s = this.kf.s(fi); % 3) compare to prediction
+                    %pred_x = s.x(1:2)';
                     if( fi == 1) %if first frame, make sure that things are good
-                        this.kf.s(fi).z = [this.nosePos(fi,:) 0 0]';
-                        pred_x = this.kf.s(fi).z(1:2)';
+                        %this.kf.s(fi).z = [this.nosePos(fi,:) 0 0]';
+                        %pred_x = this.kf.s(fi).z(1:2)';
                     end
-                    if (pdist2(pred_x, this.nosePos(fi,:)) > err_thresh) || isnan(this.nosePos(fi,1))
-                        % The difference between prediction and detected position is too big, so try
-                        % to correct (or the nose wasn't found)
-                        if cb
-                            this.correctDetection(fi, this.nosePos(fi,:), pred_x);
-                        end
-                    end
-                    % just update the filter with the proper z in order to predict next frame
-                    if fi>1 %compute frame-by-frame velocities
-                        this.bodyVel(fi, :) = this.bodyCOM(fi,:) - this.bodyCOM(fi,:);
-                        this.noseVel(fi, :) = sqrt(sum((this.nosePos(fi,:)-this.nosePos(fi-1,:)).^2));
-                        if isnan(this.nosePos(fi-1,1))
-                            vel = [0 0];
-                        else
-                            vel = this.noseVel(fi, :);
-                        end
-                    else
-                        vel = [0 0];
-                    end
-                    this.kf.s(fi).z = [this.nosePos(fi,:) vel]';
-                    % 5) make prediction for next frame
-                    if fi < this.nFrames
-                        this.kf.s(fi+1) = kalmanf(this.kf.s(fi));
-                    end
+%                     if (pdist2(pred_x, this.nosePos(fi,:)) > err_thresh) || isnan(this.nosePos(fi,1))
+%                         % The difference between prediction and detected position is too big, so try
+%                         % to correct (or the nose wasn't found)
+%                         if cb
+%                             this.correctDetection(fi, this.nosePos(fi,:), pred_x);
+%                         end
+%                     end
+%                     % just update the filter with the proper z in order to predict next frame
+%                     if fi>1 %compute frame-by-frame velocities
+%                         this.bodyVel(fi, :) = this.bodyCOM(fi,:) - this.bodyCOM(fi,:);
+%                         this.noseVel(fi, :) = sqrt(sum((this.nosePos(fi,:)-this.nosePos(fi-1,:)).^2));
+%                         if isnan(this.nosePos(fi-1,1))
+%                             vel = [0 0];
+%                         else
+%                             vel = this.noseVel(fi, :);
+%                         end
+%                     else
+%                         vel = [0 0];
+%                     end
+%                     this.kf.s(fi).z = [this.nosePos(fi,:) vel]';
+%                     % 5) make prediction for next frame
+%                     if fi < this.nFrames
+%                         this.kf.s(fi+1) = kalmanf(this.kf.s(fi));
+%                     end
                     if dbg %debug plotting
                         bin_im = zeros(this.height, this.width);
                         for kk=1:length(temp_reg)
@@ -631,9 +631,9 @@ classdef MouseTrackerKF < MouseTracker
                 else %this is a kluge - unclear what the best thing to do is if you don't detect a blob
                     subI = max(1, ii-1);
                     this.areas(segFrames(ii)) = this.areas(segFrames(subI)); %this will error on ii=1
-                    if fi < this.nFrames
-                        this.kf.s(fi+1) = kalmanf(this.kf.s(fi)); %let's update the Kalman Filter anyway
-                    end
+                    %if fi < this.nFrames
+                    %    this.kf.s(fi+1) = kalmanf(this.kf.s(fi)); %let's update the Kalman Filter anyway
+                    %end
                 end
             end
         end
@@ -789,10 +789,12 @@ classdef MouseTrackerKF < MouseTracker
                 if (isnan(taili)) taili = this.maxBlobs + 1; end %just assign it out of range for check
                 temp_pos = [];
                 temp_areas = this.areas(fi,1:this.nblobs(fi));
+                px = [];
                 for j=1:this.nblobs(fi)
                     this.orient(fi, j) = [this.areas(fi,j).Orientation]./ 180 * pi; %this is the rough estimate
                     positions = permute(reshape([temp_areas(j).Centroid], 2,[]), [3 1 2]);
                     this.COM(fi, :, j) = positions;
+                    px = cat(1, px, this.areas(i,j).PixelList);
                     if (includeTail) || (j ~= taili) %exclude the tail in the body position calculation
                         %temp_pos = cat(1, temp_pos, temp_areas(j).PixelList);
                         temp_pos = cat(1, temp_pos, positions);
@@ -800,8 +802,9 @@ classdef MouseTrackerKF < MouseTracker
                         %this.orient(fi, j) = [this.areas(fi,j).Orientation]./ 180 * pi; %this is the rough estimate
                     end
                 end
+                bodyCOM(i,:) = nanmean(px);
                 %bodyCOM(i, :) = mean(this.COM(fi,:,:),3);
-                bodyCOM(i, :) = mean(temp_pos);
+                %bodyCOM(i, :) = mean(temp_pos);
             end
         end
         
@@ -1661,7 +1664,7 @@ classdef MouseTrackerKF < MouseTracker
                             this.orient(framei,jj), this.COM(framei,1,jj),this.COM(framei,2,jj),'r');
                     text(this.COM(framei,1,jj)+10, this.COM(framei,2,jj), num2str(this.blobID(framei, jj)), 'Color','r', 'FontSize', 14);
                 end
-                line(this.bodyCOM(framei,1), this.bodyCOM(framei,2), 'Marker', 'o', 'Color', 'c','MarkerSize', 12, 'LineWidth',2);
+                line(this.bodyCOM(framei,1), this.bodyCOM(framei,2), 'Marker', 'o', 'Color', 'mq','MarkerSize', 12, 'LineWidth',2);
                     %line(this.areas(framei).Extrema(:,1), this.areas(framei).Extrema(:,2), 'Marker', '.', 'Color', 'c');
                     %[u, v] = pol2cart(this.orient(framei), this.vel(framei)*.1);
                     %quiver(this.COM(framei,1), this.COM(framei,2), u,v, 'LineWidth', 2); %plots an orientation arrow
