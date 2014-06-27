@@ -44,7 +44,7 @@ classdef MouseTracker < handle
         % trigger (eg physiology acquision system) in order to verify that the video is properly synced, and if it 
         % has skipped frames, to correct the error post hoc. If this is not in use, set the
         % fcArea to empty and it'll not be utilized.
-        fcArea = [1221, 959, 1266, 999]; %position in frame, [left, top, right, bottom]
+        fcArea = [1, 1, 1, 1]; %position in frame, [left, top, right, bottom]
         fcLum = []; % The actual values of the LED area - sum over the area used, normalized.
         fcPeriod = 50; %the period of the repeating pattern, enables easy analysis of inter cyle variability
         syncInd = []; %this is a vector of indices for each frame corresponding to an external trigger
