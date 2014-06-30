@@ -1608,11 +1608,19 @@ classdef MouseTrackerKF < MouseTracker
         % ------------------------------------------------------------------------------------------------------
         function nose_jumps = findNoseJumps(this, dist_thresh, frames)
             % reports the first frame after there is a large jump in the nose position
+            includeNAN = 1;
             if isempty(frames)
                 frames = 1:this.nFrames;
             end
             dists = sqrt(sum(diff(this.nosePos(frames,:)).^2, 2));
             nose_jumps = find(dists >= dist_thresh);
+            if includeNAN
+                ni = isnan(this.nosePos(frames,1));
+            else
+                ni = [];
+            end
+            nose_jumps = [nose_jumps; ni];
+            nose_jumps = sort(unique(nose_jumps));
         end
             
         % ------------------------------------------------------------------------------------------------------
