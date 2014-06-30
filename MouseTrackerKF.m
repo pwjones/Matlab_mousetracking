@@ -685,7 +685,7 @@ classdef MouseTrackerKF < MouseTracker
         % It makes sense to group these because they should all be performed together, and recomputed if the obh.
             this.removeStaticObjects();
             this.detectTail(frames);
-            this.bodyCOM(frames,:) = this.computeBodyPos(frames,0);
+            this.bodyCOM(frames,:) = this.computeBodyPos(frames,1);
             this.bodyOrient(frames) = this.computeBodyOrientation(frames);
             this.bodyOrient(frames) = this.fixOrientation(frames); %this should straighten out the orientations
             this.nosePos(frames, :) = this.findNose(frames); 
