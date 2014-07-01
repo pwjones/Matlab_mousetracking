@@ -40,6 +40,8 @@ rew_dists_from_trail = cell(nfiles,1);
 distract_dists_from_trail = cell(nfiles,1);
 rew_dists_from_trail_persect = cell(nfiles,1);
 distract_dists_from_trail_persect = cell(nfiles,1);
+nose_vel = cell(nfiles,1);
+body_vel = cell(nfiles,1);
 nose_trajectories = cell(nfiles,1);
 traj_dir = cell(nfiles, 1);
 traj_window = [];
@@ -88,6 +90,13 @@ for ii = 1:nfiles
     rew_propFollowed(ii) = mt.propTrailFollowed([], 1, 10);
     dist_propFollowed(ii) = mt.propTrailFollowed([],2,10);
     file_names{ii} = mt.videoFN;
+    ff = mt.getFollowingSegments([],1,following_thresh);
+    for jj = 1:size(ff,1)
+        nv{jj} = mt.noseVel(ff(jj,1):ff(jj,2));
+        bv{jj} = mt.bodyVel(ff(jj,1):ff(jj,2));
+    end
+    nose_vel{ii} = nv;
+    body_vel{ii} = bv;
 end
 
 % Results
@@ -112,3 +121,5 @@ ret.nose_trajectories = nose_trajectories;
 ret.traj_window = traj_window;
 ret.traj_dir = traj_dir;
 ret.file_names = file_names;
+ret.nose_vel = nose_vel;
+ret.body_vel = body_vel;

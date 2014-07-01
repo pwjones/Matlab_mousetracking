@@ -5,7 +5,7 @@
 concentrationDataList10x;
 %spring14CohortList;
 base_folder = VIDEO_ROOT;
-following_thresh = 20; %mm
+following_thresh = 40; %mm
 clear perMouseData;
 
 videoList = listBehavioralVideos(base_folder, folders, mouse_names);
@@ -52,14 +52,14 @@ end
 %plot(1:length(fake_prop), fake_prop *100,'Color', [.25 .25 .25]); hold on;
 figure; hold on;
 title('Trail Fraction Followed per Trial');
-nMice = length(perMouseData);
+nMice = length(perMouseData)/nConc;
 nRows = ceil(sqrt(nMice));
+filtn = 3; boxcar = ones(1,filtn)./filtn; %define the averaging filter kernel
 for ii = 1:(nMice*nConc)
     %subplot(nRows, nRows, ii); %square, many panels
     nTrials = length(perMouseData(ii).rew_dists);
     plot(perMouseData(ii).rew_prop*100, 'g'); hold on;
     plot(perMouseData(ii).dist_prop*100, 'r');
-    boxcar = [1 1 1]./ 5;
     samps_cut = floor(length(boxcar)/2);
     vi = (1+samps_cut):(length(perMouseData(ii).rew_prop)-samps_cut)
     xl = length(vi)+samps_cut;
@@ -107,10 +107,92 @@ for ii=1:nMice
    vi = (1+samps_cut):(length(rew_dist)-samps_cut);
    rew_dist_filt = conv(rew_dist, boxcar,'valid');
    distract_dist_filt = conv(distract_dist, boxcar,'valid');
-   plot(vi(tt),rew_dist_filt(tt), 'g-', 'LineWidth', 3); hold on;
-   plot(vi(tt),distract_dist_filt(tt), 'r-', 'LineWidth', 3); hold on;
+   plot(vi, rew_dist_filt, 'g-', 'LineWidth', 3); hold on;
+   plot(vi, distract_dist_filt, 'r-', 'LineWidth', 3); hold on;
    xlabel('Trial Number','FontSize', 14); ylabel('Trail Area Following Rate, mm^2/sec','FontSize', 14);
    title(mouse_names{ii});
    set(gca, 'TickDir', 'out', 'FontSize', 12)
    %ylim([0 1000]);
 end
+
+%% Let's calculate some distance dependent measures
+for jj = 1:length(perMouseData)
+    nfiles = length(perMouseData(jj).rew_prop);
+    vid_duration = perMouseData(jj).total_frames./ perMouseData(jj).frame_rate;
+    perMouseData(jj).max_dist = NaN*zeros(nfiles,2);
+    perMouseData(jj).med_dist = NaN*zeros(nfiles,2);
+    perMouseData(jj).ncrossings = NaN*zeros(nfiles,2);
+    perMouseData(jj).crossing_rates = NaN*zeros(nfiles,2);
+    for ii = 1:nfiles
+        rdists = perMouseData(jj).rew_dists{ii}; %Distance traveled near the trail
+        nzi = rdists ~= 0; %these are single frame entries onto the trail
+        rdists = rdists(nzi); %eliminate them
+        if isempty(rdists) rdists = 0; end %but having an empty variable isn't good later
+        ddists = perMouseData(jj).distract_dists{ii};
+        nzi = ddists ~= 0;
+        ddists = ddists(nzi); 
+        if isempty(ddists) ddists = 0; end
+        perMouseData(jj).ncrossings(ii,:) = [length(rdists) length(ddists)];
+        %rew_crossing_rate(ii) = length(rew_dists{ii})/vid_duration;
+        %dist_crossing_rate(ii) = length(distract_dists{ii})/vid_duration;
+        perMouseData(jj).max_dist(ii,:) = [max(rdists) max(ddists)];
+        perMouseData(jj).med_dist(ii,:) = [median(rdists) median(ddists)];
+    end
+    perMouseData(jj).crossing_rates(:,1) = perMouseData(jj).ncrossings(:,1)./vid_duration;
+    perMouseData(jj).crossing_rates(:,2) = perMouseData(jj).ncrossings(:,2)./vid_duration;
+    perMouseData(jj).rew_crossingrates_filt = conv(perMouseData(jj).crossing_rates(:,1), boxcar,'valid');
+    perMouseData(jj).dist_crossingrates_filt = conv(perMouseData(jj).crossing_rates(:,2), boxcar,'valid');
+    
+    % cell arrays of these things
+    
+end
+
+%% Plotting the distance measures
+figure; hold on;
+title('Trail Crossings', 'FontSize', 16);
+for jj = 1:length(perMouseData)
+    hold on;
+    plot(perMouseData(jj).crossing_rates(:,1), 'g', 'LineWidth',.5); hold on; 
+    plot(perMouseData(jj).crossing_rates(:,2), 'r', 'LineWidth',.5);
+    rew_crossingrates_filt = conv(perMouseData(jj).crossing_rates(:,1), boxcar,'valid');
+    dist_crossingrates_filt = conv(perMouseData(jj).crossing_rates(:,2), boxcar,'valid');
+    vi = (1+samps_cut):(samps_cut+length(rew_crossingrates_filt));
+    plot(vi, rew_crossingrates_filt, 'g', 'LineWidth',2); % plot boxcar averaged ones 
+    plot(vi, dist_crossingrates_filt, 'r', 'LineWidth',2);
+    legend({'Rewarded Trail', 'Distracter Trail'});
+    xlabel('Trial #', 'FontSize', 14); ylabel('Trail Crossings per second', 'FontSize', 14);
+end
+
+%% %median distances
+figure; hold on;
+for jj = 1:length(perMouseData)
+    med_dist_filt = [conv( perMouseData(jj).med_dist(:,1), boxcar(:),'valid') conv( perMouseData(jj).med_dist(:,2), boxcar(:),'valid')]; 
+    plot(perMouseData(jj).med_dist(:,1), 'g', 'LineWidth', .5); hold on;
+    plot(perMouseData(jj).med_dist(:,2), 'r', 'LineWidth', .5);
+    vi = (1+samps_cut):(samps_cut+size(med_dist_filt,1));
+    plot(vi, med_dist_filt(:,1), 'g', 'LineWidth', 2); 
+    plot(vi, med_dist_filt(:,2), 'r', 'LineWidth', 2);    
+end
+legend({'Rewarded Trail', 'Distracter Trail'});
+xlabel('Trial #', 'FontSize', 14); ylabel('Median Following Distance (px)', 'FontSize', 14);
+
+%% Mouse velocities as they are following the trail
+
+figure; hold on;
+
+for jj = 1:length(perMouseData)
+    bodyVel = []; noseVel = [];
+    for kk = 1:length(perMouseData(jj).body_vel)
+        for ll= 1:length(perMouseData(jj).body_vel{kk})
+            temp = perMouseData(jj).body_vel{kk}{ll};
+            bodyVel = cat(1, bodyVel, temp(:));
+            temp = perMouseData(jj).nose_vel{kk}{ll};
+            noseVel = cat(1, noseVel, temp(:));
+        end
+    end
+    figure; hist(bodyVel, 200); hold on; plot([1 2 3 4 5; 1 2 3 4 5], [0 0 0 0 0; 1000 1000 1000 1000 1000], '--k');
+    figure; hist(noseVel, 200); hold on; plot([1 2 3 4 5; 1 2 3 4 5], [0 0 0 0 0; 1000 1000 1000 1000 1000], '--k');
+end
+
+% Let's plot the histograms of velocity
+figure; 
