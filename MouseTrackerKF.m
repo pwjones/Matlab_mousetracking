@@ -1764,6 +1764,11 @@ classdef MouseTrackerKF < MouseTracker
         %         varargin - a threshold value if you want to specify that for a binary movie 
             [frame_ints, flag] = this.listToIntervals(frames);
             rawArray = this.readFrames(frame_ints, flag);
+            if (size(rawArray,3) ~= length(frames(:)))
+                disp('In MouseTrackerKF.readMovieSection: readFrames has returned an array of different length than requested');
+                s3 = size(rawArray,3);
+                frames = 1:s3;
+            end
             [movieArray, ~, ~, fc_val] = this.processFrameArray(rawArray, 1:length(frames), this.avgFrame, movieType, varargin{:});
         end
         

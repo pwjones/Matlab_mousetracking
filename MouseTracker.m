@@ -27,8 +27,8 @@ classdef MouseTracker < handle
         bodyOrient %the orientation of the entire body (minus tail), in radians 0-360
         orient % orientation of each blob
         vel % velocity of each blob
-        bodyVel
-        noseVel
+        bodyVel %px/frame
+        noseVel %px/frame
         direction %movement direction, blob-wise
         nosePos %the tip of the nose
         times % frame times
