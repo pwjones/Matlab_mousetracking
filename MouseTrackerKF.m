@@ -1664,7 +1664,7 @@ classdef MouseTrackerKF < MouseTracker
                             this.orient(framei,jj), this.COM(framei,1,jj),this.COM(framei,2,jj),'r');
                     text(this.COM(framei,1,jj)+10, this.COM(framei,2,jj), num2str(this.blobID(framei, jj)), 'Color','r', 'FontSize', 14);
                 end
-                line(this.bodyCOM(framei,1), this.bodyCOM(framei,2), 'Marker', 'o', 'Color', 'mq','MarkerSize', 12, 'LineWidth',2);
+                line(this.bodyCOM(framei,1), this.bodyCOM(framei,2), 'Marker', 'o', 'Color', 'm','MarkerSize', 12, 'LineWidth',2);
                     %line(this.areas(framei).Extrema(:,1), this.areas(framei).Extrema(:,2), 'Marker', '.', 'Color', 'c');
                     %[u, v] = pol2cart(this.orient(framei), this.vel(framei)*.1);
                     %quiver(this.COM(framei,1), this.COM(framei,2), u,v, 'LineWidth', 2); %plots an orientation arrow
@@ -1761,6 +1761,11 @@ classdef MouseTrackerKF < MouseTracker
         %         varargin - a threshold value if you want to specify that for a binary movie 
             [frame_ints, flag] = this.listToIntervals(frames);
             rawArray = this.readFrames(frame_ints, flag);
+            if (size(rawArray,3) ~= length(frames(:)))
+                disp('In MouseTrackerKF.readMovieSection: readFrames has returned an array of different length than requested');
+                s3 = size(rawArray,3);
+                frames = 1:s3;
+            end
             [movieArray, ~, ~, fc_val] = this.processFrameArray(rawArray, 1:length(frames), this.avgFrame, movieType, varargin{:});
         end
         
