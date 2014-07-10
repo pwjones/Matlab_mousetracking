@@ -177,9 +177,10 @@ legend({'Rewarded Trail', 'Distracter Trail'});
 xlabel('Trial #', 'FontSize', 14); ylabel('Median Following Distance (px)', 'FontSize', 14);
 
 %% Mouse velocities as they are following the trail
-
-figure; hold on;
-
+mm_conv = 1.16; %mm/px linear
+figure; nva = axes; hold on;
+%figure; bva = axes; hold on;
+colors = {[0 0 0], [1 0 0], [0 0 1], [0 1 0]};
 for jj = 1:length(perMouseData)
     bodyVel = []; noseVel = [];
     for kk = 1:length(perMouseData(jj).body_vel)
@@ -190,9 +191,19 @@ for jj = 1:length(perMouseData)
             noseVel = cat(1, noseVel, temp(:));
         end
     end
-    figure; hist(bodyVel, 200); hold on; plot([1 2 3 4 5; 1 2 3 4 5], [0 0 0 0 0; 1000 1000 1000 1000 1000], '--k');
-    figure; hist(noseVel, 200); hold on; plot([1 2 3 4 5; 1 2 3 4 5], [0 0 0 0 0; 1000 1000 1000 1000 1000], '--k');
+    noseVel = noseVel * mm_conv * 60; %conversion: px/frame * mm/px * frames/sec = mm/sec
+    velThresh = 10;
+    fi = noseVel >= velThresh;
+    noseVel = noseVel(fi);
+    %[yv, bins] = hist(bodyVel, 200);
+    %plot(bva, bins, yv, 'Color', colors{mod(jj-1,length(colors)-1)+1}, 'LineWidth',2);
+    %[yv, bins] = hist(noseVel, 200);
+    %plot(nva, bins, yv, 'Color', colors{mod(jj-1,length(colors)-1)+1}, 'LineWidth',2);
+    %axes(bva);
+    %plotEmpiricalCDF({bodyVel}, .1, {colors{mod(jj-1,length(colors)-1)+1}}, '-', bva);
+    axes(nva);
+    plotEmpiricalCDF({noseVel}, 1, {colors{mod(jj-1,length(colors)-1)+1}}, '-', nva);
+    %plot(bva, [1 2 3 4 5; 1 2 3 4 5], [0 0 0 0 0; 1 1 1 1 1], '--k');
 end
-
-% Let's plot the histograms of velocity
-figure; 
+%plot(bva, [1 2 3 4 5; 1 2 3 4 5], [0 0 0 0 0; 1000 1000 1000 1000 1000], '--k');
+%plot(nva, [1 2 3 4 5; 1 2 3 4 5], [0 0 0 0 0; 1000 1000 1000 1000 1000], '--k');
