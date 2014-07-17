@@ -332,20 +332,21 @@ function propogate_btn_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 
 currFrame = handles.currFrame;
-noseID = mt.blobID(currFrame, mt.noseblobs(currFrame));
-% propogate forward
-nf = currFrame + 1; prop = 1;
-while (nf <= mt.nFrames) && prop
-    ids = mt.blobID(nf,:);
-    match = find(noseID == ids);
-    if ~isempty(match)
-        mt.noseblob(nf) = match;
-        mt.nosePos(nf,:) = mt.areas(nf,match).Centroid;
-        prop = 1;
-    else
-        prop = 0;
-    end
-end
+handles.tracker.propogateNosePosition(currFrame);
+% noseID = mt.blobID(currFrame, mt.noseblobs(currFrame));
+% % propogate forward
+% nf = currFrame + 1; prop = 1;
+% while (nf <= mt.nFrames) && prop
+%     ids = mt.blobID(nf,:);
+%     match = find(noseID == ids);
+%     if ~isempty(match)
+%         mt.noseblob(nf) = match;
+%         mt.nosePos(nf,:) = mt.areas(nf,match).Centroid;
+%         prop = 1;
+%     else
+%         prop = 0;
+%     end
+% end
 
 
 

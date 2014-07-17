@@ -203,6 +203,8 @@ classdef MouseTrackerKF < MouseTracker
             ylim([0 this.height]);
             for ii=1:length(frames)
                 fi = frames(ii);
+                %line('Parent', ah, 'Xdata', this.bodyCOM(fi,1), 'Ydata', this.bodyCOM(fi,2), ...
+                %        'Marker', '.','MarkerSize', 8, 'Color', c);
                 if ~isnan(this.noseblob(fi))
                     % So, this way we can't plot a solid line.
                     line('Parent', ah, 'Xdata', this.nosePos(fi,1), 'Ydata', this.nosePos(fi,2), ...
@@ -672,8 +674,38 @@ classdef MouseTrackerKF < MouseTracker
         end
 
         % ------------------------------------------------------------------------------------------------------
-        function propogateNosePosition
-            
+        function propogateNosePosition(this, seedFrame)
+        % function propogateNosePosition(this, seedFrame)
+        %
+        % The assigns the nose position to be the area with the same blob ID above and below the seed
+        % frame
+            noseID = this.blobID(seedFrame, this.noseblob(seedFrame));
+            currFrame = seedFrame + 1;
+            exit = 0;
+            while (currFrame <= this.nFrames) && ~exit %forwards
+                ids = this.blobID(currFrame,:);
+                matchi = find(ids == noseID);
+                if ~isempty(matchi)
+                    this.noseblob(currFrame) = matchi;
+                    this.nosePos(currFrame,:) = this.areas(currFrame, matchi).Centroid;
+                    currFrame = currFrame + 1;
+                else
+                    exit = 1;
+                end
+            end
+            currFrame = seedFrame -1;
+            exit = 0;
+            while (currFrame > 0) && ~exit %backwards
+                ids = this.blobID(currFrame,:);
+                matchi = find(ids == noseID);
+                if ~isempty(matchi)
+                    this.noseblob(currFrame) = matchi;
+                    this.nosePos(currFrame,:) = this.areas(currFrame, matchi).Centroid;
+                    currFrame = currFrame - 1;
+                else
+                    exit = 1;
+                end
+            end  
         end
         
         % ------------------------------------------------------------------------------------------------------

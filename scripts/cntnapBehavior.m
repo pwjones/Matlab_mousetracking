@@ -2,11 +2,10 @@
 
 %% Sets vars and loads the dataset %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %concentrationDataList2x; % this script contains the mouse and file names to be included in the analysis.
-concentrationDataList10x;
 cntnapDataList;
 %spring14CohortList;
 base_folder = VIDEO_ROOT;
-following_thresh = 40; %mm
+following_thresh = 20; %mm
 clear perMouseData;
 
 videoList = listBehavioralVideos(base_folder, folders, mouse_names);
@@ -27,12 +26,12 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Run analysis on the dataset %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% Averaged Trail Crossing Triggered Nose Trajectories
-popNoseTraj(perMouseData(1:3), ctl_trials(1:3), {[0 0 0], [1 0 0], [0 0 1]}, []);
-popNoseTraj(perMouseData(4:6), ctl_trials(4:6), {[0 0 0], [1 0 0], [0 0 1]}, []);
+%popNoseTraj(perMouseData(1:3), ctl_trials(1:3), {[0 0 0], [1 0 0], [0 0 1]}, []);
+%popNoseTraj(perMouseData(4:6), ctl_trials(4:6), {[0 0 0], [1 0 0], [0 0 1]}, []);
 
 %% Nose position CDF while following
-nMice = 2;
-nConc = 3;
+nMice = 4;
+nConc = 1;
 nRows = ceil(sqrt(nMice));
 fh = figure; hold on;
 for jj = 1:nMice
@@ -40,8 +39,8 @@ for jj = 1:nMice
         ii= (jj-1)*nConc + (kk-1) + 1;
         %rew{kk} = perMouseData(ii).rew_dists_from_trail_persect(ctl_trials{ii});
         %dist{kk} = perMouseData(ii).distract_dists_from_trail_persect(ctl_trials{ii}); 
-        rew{kk} = perMouseData(ii).rew_dists_from_trail(ctl_trials{ii});
-        dist{kk} = perMouseData(ii).distract_dists_from_trail(ctl_trials{ii});
+        rew{ii} = perMouseData(ii).rew_dists_from_trail(ctl_trials{ii});
+        dist{ii} = perMouseData(ii).distract_dists_from_trail(ctl_trials{ii});
     end
     figure(fh);
     ah = subplot(nRows, nRows, jj); %square, many panels
@@ -51,7 +50,8 @@ end
 
 %% Plot the time on trail over time.
 %plot(1:length(fake_prop), fake_prop *100,'Color', [.25 .25 .25]); hold on;
-figure; hold on;
+figure; hold on; ah1 = axes;
+figure; hold on; ah2 = axes;
 title('Trail Fraction Followed per Trial');
 nMice = length(perMouseData)/nConc;
 nRows = ceil(sqrt(nMice));
@@ -59,8 +59,9 @@ filtn = 3; boxcar = ones(1,filtn)./filtn; %define the averaging filter kernel
 for ii = 1:(nMice*nConc)
     %subplot(nRows, nRows, ii); %square, many panels
     nTrials = length(perMouseData(ii).rew_dists);
-    plot(perMouseData(ii).rew_prop*100, 'g'); hold on;
-    plot(perMouseData(ii).dist_prop*100, 'r');
+    plot(ah1, perMouseData(ii).rew_prop*100, 'Color', gcolor{genotype(ii)}); hold on;
+    plot(ah1, perMouseData(ii).dist_prop*100, 'r');
+    plot(ah2, perMouseData(ii).rew_prop/(perMouseData(ii).rew_prop+perMouseData(ii).dist_prop)*100, 'Color', gcolor{genotype(ii)}); hold on;
     samps_cut = floor(length(boxcar)/2);
     vi = (1+samps_cut):(length(perMouseData(ii).rew_prop)-samps_cut)
     xl = length(vi)+samps_cut;
@@ -71,15 +72,23 @@ for ii = 1:(nMice*nConc)
     dist_prop_filt = conv(perMouseData(ii).dist_prop, boxcar,'valid');
     %vi = (1+samps_cut):(samps_cut+length(rew_prop_filt));
     %flh = plot(vi, fake_prop_filt*100,'LineWidth',2, 'Color', [.25 .25 .25]);
-    plot(vi, rew_prop_filt*100, 'g', 'LineWidth',3);
-    plot(vi, dist_prop_filt*100, 'r', 'LineWidth',3);
+    plot(ah1, vi, rew_prop_filt*100, 'Color', gcolor{genotype(ii)}, 'LineWidth',3);
+    plot(ah1, vi, dist_prop_filt*100, 'r', 'LineWidth',3);
     set(gca, 'TickDir','out', 'fontsize', 16);
     xlabel('Trial #','FontSize', 18);
     ylabel('% Time on Trail','FontSize', 18);
     title(mouse_names{ii});
+    % Let's do a slightly different measure - ratio of following rewarded/total
+    plot(ah2, vi, rew_prop_filt/(rew_prop_filt+dist_prop_filt)*100, 'Color', gcolor{genotype(ii)}, 'LineWidth',3);
+    set(gca, 'TickDir','out', 'fontsize', 16);
+    xlabel('Trial #','FontSize', 18);
+    ylabel('% Time Following Rewarded Trail','FontSize', 18);
+    title(mouse_names{ii});
     %legend({'Rewarded Trail', 'Distracter Trail'});
     %title('Proportion of Time Following Trails');
 end
+
+
 
 %% Plotting the area of trail followed as a rate
 % This gives a measure of diligence in trail following
@@ -103,12 +112,12 @@ for ii=1:nMice
    x = 1:nTrials;
    tt = train_trials{ii};
    rew_dist = rew_dist./movie_time; distract_dist = distract_dist./movie_time; %Make them rates
-   plot(x(tt),rew_dist(tt), 'g-', 'LineWidth', .5); hold on;
+   plot(x(tt),rew_dist(tt), '-', 'LineWidth', .5, 'Color', gcolor{genotype(ii)}); hold on;
    plot(x(tt),distract_dist(tt), 'r-', 'LineWidth', .5); hold on;
    vi = (1+samps_cut):(length(rew_dist)-samps_cut);
    rew_dist_filt = conv(rew_dist, boxcar,'valid');
    distract_dist_filt = conv(distract_dist, boxcar,'valid');
-   plot(vi, rew_dist_filt, 'g-', 'LineWidth', 3); hold on;
+   plot(vi, rew_dist_filt, '-', 'LineWidth', 3, 'Color', gcolor{genotype(ii)}); hold on;
    plot(vi, distract_dist_filt, 'r-', 'LineWidth', 3); hold on;
    xlabel('Trial Number','FontSize', 14); ylabel('Trail Area Following Rate, mm^2/sec','FontSize', 14);
    title(mouse_names{ii});
@@ -153,12 +162,12 @@ figure; hold on;
 title('Trail Crossings', 'FontSize', 16);
 for jj = 1:length(perMouseData)
     hold on;
-    plot(perMouseData(jj).crossing_rates(:,1), 'g', 'LineWidth',.5); hold on; 
+    plot(perMouseData(jj).crossing_rates(:,1), 'LineWidth',.5,'Color', gcolor{genotype(ii)}); hold on; 
     plot(perMouseData(jj).crossing_rates(:,2), 'r', 'LineWidth',.5);
     rew_crossingrates_filt = conv(perMouseData(jj).crossing_rates(:,1), boxcar,'valid');
     dist_crossingrates_filt = conv(perMouseData(jj).crossing_rates(:,2), boxcar,'valid');
     vi = (1+samps_cut):(samps_cut+length(rew_crossingrates_filt));
-    plot(vi, rew_crossingrates_filt, 'g', 'LineWidth',2); % plot boxcar averaged ones 
+    plot(vi, rew_crossingrates_filt,'LineWidth',2,'Color', gcolor{genotype(jj)}); % plot boxcar averaged ones 
     plot(vi, dist_crossingrates_filt, 'r', 'LineWidth',2);
     legend({'Rewarded Trail', 'Distracter Trail'});
     xlabel('Trial #', 'FontSize', 14); ylabel('Trail Crossings per second', 'FontSize', 14);
@@ -168,10 +177,10 @@ end
 figure; hold on;
 for jj = 1:length(perMouseData)
     med_dist_filt = [conv( perMouseData(jj).med_dist(:,1), boxcar(:),'valid') conv( perMouseData(jj).med_dist(:,2), boxcar(:),'valid')]; 
-    plot(perMouseData(jj).med_dist(:,1), 'g', 'LineWidth', .5); hold on;
+    plot(perMouseData(jj).med_dist(:,1), 'LineWidth', .5,'Color', gcolor{genotype(ii)}); hold on;
     plot(perMouseData(jj).med_dist(:,2), 'r', 'LineWidth', .5);
     vi = (1+samps_cut):(samps_cut+size(med_dist_filt,1));
-    plot(vi, med_dist_filt(:,1), 'g', 'LineWidth', 2); 
+    plot(vi, med_dist_filt(:,1),'LineWidth', 2,'Color', gcolor{genotype(jj)}); 
     plot(vi, med_dist_filt(:,2), 'r', 'LineWidth', 2);    
 end
 legend({'Rewarded Trail', 'Distracter Trail'});
