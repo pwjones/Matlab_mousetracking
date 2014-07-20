@@ -34,25 +34,25 @@ nMice = 4;
 nConc = 1;
 nRows = ceil(sqrt(nMice));
 fh = figure; hold on;
-for jj = 1:nMice
-    for kk = 1:nConc
-        ii= (jj-1)*nConc + (kk-1) + 1;
+for ii = 1:(nMice*nConc)
         %rew{kk} = perMouseData(ii).rew_dists_from_trail_persect(ctl_trials{ii});
         %dist{kk} = perMouseData(ii).distract_dists_from_trail_persect(ctl_trials{ii}); 
         rew{ii} = perMouseData(ii).rew_dists_from_trail(ctl_trials{ii});
         dist{ii} = perMouseData(ii).distract_dists_from_trail(ctl_trials{ii});
-    end
-    figure(fh);
-    ah = subplot(nRows, nRows, jj); %square, many panels
-    plotDistanceHistComparison(rew{1},rew{2}, rew{3}, dist{1}, following_thresh, '', ah);
-    axes(ah); title(mouse_names{ii});
 end
+% figure(fh);
+% for ii = 1:(nMice*nConc)
+%     ah = subplot(nRows, nRows, ii); %square, many panels
+%     plotDistanceHistComparison(rew{1},rew{2}, rew{3}, dist{1}, following_thresh, '', ah);
+%     axes(ah); title(mouse_names{ii});
+% end
 
 %% Plot the time on trail over time.
 %plot(1:length(fake_prop), fake_prop *100,'Color', [.25 .25 .25]); hold on;
-figure; hold on; ah1 = axes;
-figure; hold on; ah2 = axes;
-title('Trail Fraction Followed per Trial');
+figure; ah1 = axes; hold on;
+figure; ah2 = axes; hold on;
+figure; ah2 = axes; hold on;
+%title('Trail Fraction Followed per Trial');
 nMice = length(perMouseData)/nConc;
 nRows = ceil(sqrt(nMice));
 filtn = 3; boxcar = ones(1,filtn)./filtn; %define the averaging filter kernel
@@ -60,8 +60,9 @@ for ii = 1:(nMice*nConc)
     %subplot(nRows, nRows, ii); %square, many panels
     nTrials = length(perMouseData(ii).rew_dists);
     plot(ah1, perMouseData(ii).rew_prop*100, 'Color', gcolor{genotype(ii)}); hold on;
-    plot(ah1, perMouseData(ii).dist_prop*100, 'r');
-    plot(ah2, perMouseData(ii).rew_prop/(perMouseData(ii).rew_prop+perMouseData(ii).dist_prop)*100, 'Color', gcolor{genotype(ii)}); hold on;
+    plot(ah1, perMouseData(ii).dist_prop*100, 'r'); hold on;
+    propFollowing = perMouseData(ii).rew_prop./(perMouseData(ii).rew_prop+perMouseData(ii).dist_prop);
+    plot(ah2, propFollowing*100, 'Color', gcolor{genotype(ii)}); hold on;
     samps_cut = floor(length(boxcar)/2);
     vi = (1+samps_cut):(length(perMouseData(ii).rew_prop)-samps_cut)
     xl = length(vi)+samps_cut;
@@ -79,13 +80,18 @@ for ii = 1:(nMice*nConc)
     ylabel('% Time on Trail','FontSize', 18);
     title(mouse_names{ii});
     % Let's do a slightly different measure - ratio of following rewarded/total
-    plot(ah2, vi, rew_prop_filt/(rew_prop_filt+dist_prop_filt)*100, 'Color', gcolor{genotype(ii)}, 'LineWidth',3);
+    plot(ah2, vi(:), (rew_prop_filt./(rew_prop_filt+dist_prop_filt))*100, 'Color', gcolor{genotype(ii)}, 'LineWidth',3);
     set(gca, 'TickDir','out', 'fontsize', 16);
     xlabel('Trial #','FontSize', 18);
     ylabel('% Time Following Rewarded Trail','FontSize', 18);
     title(mouse_names{ii});
-    %legend({'Rewarded Trail', 'Distracter Trail'});
-    %title('Proportion of Time Following Trails');
+    plot(ah3, ones(length(propFollowing),1)*ii, propFollowing, 'LineStyle','.', 'Color', gcolor{genotype(ii)}, 'LineWidth',3);
+    plot(ah3, ii, mean(propFollowing), 'LineStyle', 'o', 'Color', gcolor{genotype(ii)});
+    set(gca, 'TickDir','out', 'fontsize', 16);
+    xlabel('Trial #','FontSize', 18);
+    ylabel('% Time Following Rewarded Trail','FontSize', 18);
+    title(mouse_names{ii});
+    
 end
 
 
@@ -173,12 +179,12 @@ for jj = 1:length(perMouseData)
     xlabel('Trial #', 'FontSize', 14); ylabel('Trail Crossings per second', 'FontSize', 14);
 end
 
-%% %median distances
+%% Plotting following distances
 figure; hold on;
 for jj = 1:length(perMouseData)
     med_dist_filt = [conv( perMouseData(jj).med_dist(:,1), boxcar(:),'valid') conv( perMouseData(jj).med_dist(:,2), boxcar(:),'valid')]; 
-    plot(perMouseData(jj).med_dist(:,1), 'LineWidth', .5,'Color', gcolor{genotype(ii)}); hold on;
-    plot(perMouseData(jj).med_dist(:,2), 'r', 'LineWidth', .5);
+    plot(perMouseData(jj).med_dist(:,1), '-', 'LineWidth', .5,'Color', gcolor{genotype(jj)}); hold on;
+    plot(perMouseData(jj).med_dist(:,2), '-', 'Color', 'r', 'LineWidth', .5);
     vi = (1+samps_cut):(samps_cut+size(med_dist_filt,1));
     plot(vi, med_dist_filt(:,1),'LineWidth', 2,'Color', gcolor{genotype(jj)}); 
     plot(vi, med_dist_filt(:,2), 'r', 'LineWidth', 2);    
@@ -212,7 +218,7 @@ for jj = 1:length(perMouseData)
     %axes(bva);
     %plotEmpiricalCDF({bodyVel}, .1, {colors{mod(jj-1,length(colors)-1)+1}}, '-', bva);
     axes(nva);
-    plotEmpiricalCDF({noseVel}, 1, {colors{mod(jj-1,length(colors)-1)+1}}, '-', nva);
+    plotEmpiricalCDF({noseVel}, 1, {gcolor{genotype(jj)}}, '-', nva);
     %plot(bva, [1 2 3 4 5; 1 2 3 4 5], [0 0 0 0 0; 1 1 1 1 1], '--k');
 end
 %plot(bva, [1 2 3 4 5; 1 2 3 4 5], [0 0 0 0 0; 1000 1000 1000 1000 1000], '--k');
