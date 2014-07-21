@@ -2,7 +2,7 @@ classdef MouseTrackerKF < MouseTracker
     properties
         default_thresh = 0;
         used_thresh = 0;
-        p_mouse = .0008; %the proportion of pixels that are 
+        p_mouse = .001; %the proportion of pixels that are 
         kf = struct('nstates', {}, 'nob', {}, 's', {});
         mm_conv = 1.16; %mm/px linear
         fullPaths;
@@ -524,7 +524,6 @@ classdef MouseTrackerKF < MouseTracker
             nSegs = ceil(length(frames)/this.framesPerSeg);
             movieDone = 0; 
             
-            
             for jj = 1:nSegs %divide the computation up into segments so that there is never too much in memory at once
                 first = (jj-1)*this.framesPerSeg + 1; %first frame of segment
                 if (jj == nSegs) % the last frame
@@ -589,23 +588,10 @@ classdef MouseTrackerKF < MouseTracker
                     this.detectTail(fi);
                     this.bodyCOM(fi,:) = this.computeBodyPos(fi,1); % 1) get the center of mass of animal
                     [this.nosePos(fi,:), this.noseblob(fi)] = this.findNose(fi); % 2) get the nose blob
-                    s = this.kf.s(fi); % 3) compare to prediction
-                    pred_x = s.x(1:2)';
-                    if( fi == 1) %if first frame, make sure that things are good
-                        this.kf.s(fi).z = [this.nosePos(fi,:) 0 0]';
-                        pred_x = this.kf.s(fi).z(1:2)';
-                    end
-                    if (pdist2(pred_x, this.nosePos(fi,:)) > err_thresh) || isnan(this.nosePos(fi,1))
-                        % The difference between prediction and detected position is too big, so try
-                        % to correct (or the nose wasn't found)
-                        if cb
-                            this.correctDetection(fi, this.nosePos(fi,:), pred_x);
-                        end
-                    end
-                    % just update the filter with the proper z in order to predict next frame
+                   
                     if fi>1 %compute frame-by-frame velocities
                         this.bodyVel(fi, :) = this.bodyCOM(fi,:) - this.bodyCOM(fi,:);
-                        this.noseVel(fi, :) = this.nosePos(fi,:)-this.nosePos(fi-1,:);
+                        this.noseVel(fi, :) = sqrt(sum((this.nosePos(fi,:)-this.nosePos(fi-1,:)).^2));
                         if isnan(this.nosePos(fi-1,1))
                             vel = [0 0];
                         else
@@ -614,11 +600,7 @@ classdef MouseTrackerKF < MouseTracker
                     else
                         vel = [0 0];
                     end
-                    this.kf.s(fi).z = [this.nosePos(fi,:) vel]';
-                    % 5) make prediction for next frame
-                    if fi < this.nFrames
-                        this.kf.s(fi+1) = kalmanf(this.kf.s(fi));
-                    end
+                    
                     if dbg %debug plotting
                         bin_im = zeros(this.height, this.width);
                         for kk=1:length(temp_reg)
@@ -629,11 +611,11 @@ classdef MouseTrackerKF < MouseTracker
                         hold on; plot(this.bodyCOM(fi,1), this.bodyCOM(fi,2),'yx','MarkerSize',12);
                     end
                 else %this is a kluge - unclear what the best thing to do is if you don't detect a blob
-                    subI = max(1, ii-1);
-                    this.areas(segFrames(ii)) = this.areas(segFrames(subI)); %this will error on ii=1
-                    if fi < this.nFrames
-                        this.kf.s(fi+1) = kalmanf(this.kf.s(fi)); %let's update the Kalman Filter anyway
-                    end
+%                     subI = max(1, ii-1);
+%                     this.areas(segFrames(ii)) = this.areas(segFrames(subI)); %this will error on ii=1
+%                     if fi < this.nFrames
+%                         this.kf.s(fi+1) = kalmanf(this.kf.s(fi)); %let's update the Kalman Filter anyway
+%                     end
                 end
             end
         end
@@ -761,48 +743,79 @@ classdef MouseTrackerKF < MouseTracker
         % So, the method for finding which blob is the nose is to take the tail and body center and take the 
         % distance along that vector for every blob centroid. The one with the largest is the nose.
             %nosePos = NaN* zeros(length(frames), 2);
+            bestFrames = false(size(frames));
+            candidate = zeros(size(frames));
+            noseDists = zeros(size(frames));
             nosePos = this.nosePos(frames,:);
             noseblob = this.noseblob(frames);
+            dot_thresh = 2000; % This is just an empirical value for the dot product of body vect/nose vector
+            % go through the frame set and identify the best candidates for the nose
             for ii = 1:length(frames)
                 fi = frames(ii);
-                regions = this.areas(fi,:);
-                maxo = 0;
-                if fi >1 && ~isnan(this.noseblob(fi-1)) %finding similarity with previously id'd nose 
-                    if (ii == 1) prev_nb = this.noseblob(fi-1);
-                    else prev_nb = noseblob(ii-1);
+                if this.tailVisible(fi) && (this.nblobs(fi) > 2)%we can only do this first method if the tail is present
+                    % compute the vector from tail to body center
+                    bodyVect = this.bodyCOM(fi,:) - this.areas(fi,this.tailblob(fi)).Centroid;
+                    dist = [];
+                    for jj=1:this.nblobs(fi)
+                        areaVect = this.areas(fi,jj).Centroid - this.areas(fi,this.tailblob(fi)).Centroid;
+                        dist(jj) = dot(areaVect, bodyVect);
                     end
-                    prev_nose = this.areas(fi-1,prev_nb);
-                    overlap = regionOverlap(prev_nose, regions, this.regprops);
-                    [maxo, maxoi] = max(overlap);
-                end
-                if maxo > .7 %nearly all non-nose blobs have zero overlap with a well defined nose
-                    noseblob(ii) = maxoi;
-                elseif (this.nblobs(fi) >= 3) %only works if there are enough things to track
-                    if this.tailVisible(fi) && (this.nblobs(fi) > 2)%we can only do this first method if the tail is present
-                        % compute the vector from tail to body center
-                        bodyVect = this.bodyCOM(fi,:) - this.areas(fi,this.tailblob(fi)).Centroid;
-                        dist = [];
-                        for jj=1:this.nblobs(fi)
-                            areaVect = this.areas(fi,jj).Centroid - this.areas(fi,this.tailblob(fi)).Centroid;
-                            dist(jj) = dot(areaVect, bodyVect);
-                        end
-                        [maxd, maxi] = max(dist); %the maximum distance and ind along tail-body vector of each blob  
-                        noseblob(ii) = maxi; 
-                         % The nose is the farthest along vector
-                    end
-                end
-                if ~isnan(noseblob(ii))
-                    nosePos(ii,:) = this.areas(fi,noseblob(ii)).Centroid;
+                    [maxd, maxi] = max(dist); %the maximum distance and ind along tail-body vector of each blob
+                    candidate(ii) = maxi;
+                    noseDists(ii) = maxd;
+                    bestFrames(ii) = maxd >= dot_thresh;
                 end
             end
-            % putting in a maximum distance criterion of 50 px away from last frame
-            %maximum instantanous velocity
-            max_vel = 1200; %px/sec = distance*frame rate
-            dists = diff(nosePos,1,1);
-            dists = sqrt(sum(dists.^2,2));
-            toofar = dists*this.frameRate > max_vel;
-            nosePos(toofar,:) = NaN*zeros(sum(toofar), 2);
-            
+            bestFrames = find(bestFrames == 1);
+            %bestFrames = frames(bestFramesLocal); % necessary to get the right overall frame numbers if called with a subset of frames
+            for ii = 1:length(bestFrames)
+                fi = bestFrames(ii);
+                nosePos(fi,:) = this.areas(frames(fi), candidate(fi)).Centroid;
+                noseblob(fi) = candidate(fi);
+                this.nosePos(frames(fi),:) = nosePos(fi,:);
+                this.noseblob(frames(fi)) = noseblob(fi);
+                this.propogateNosePosition(frames(fi));
+            end
+%             for ii = 1:length(frames)
+%                 fi = frames(ii);
+%                 regions = this.areas(fi,:);
+%                 ids = this.blobID(fi,:);
+%                 maxo = 0;
+%                 if fi > 1 && ~isnan(this.noseblob(fi-1)) %finding similarity with previously id'd nose 
+%                     if (ii == 1) prev_nb = this.noseblob(fi-1);
+%                     else prev_nb = noseblob(ii-1);
+%                     end
+%                     prev_noseID = this.blobID(fi-1,prev_nb);
+%                     id_match = find(prev_noseID == ids);
+%                 end
+%                 if ~isempty(id_match) %nearly all non-nose blobs have zero overlap with a well defined nose
+%                     noseblob(ii) = id_match;
+%                 elseif (this.nblobs(fi) >= 3) %only works if there are enough things to track
+%                     if this.tailVisible(fi) && (this.nblobs(fi) > 2)%we can only do this first method if the tail is present
+%                         % compute the vector from tail to body center
+%                         bodyVect = this.bodyCOM(fi,:) - this.areas(fi,this.tailblob(fi)).Centroid;
+%                         dist = [];
+%                         for jj=1:this.nblobs(fi)
+%                             areaVect = this.areas(fi,jj).Centroid - this.areas(fi,this.tailblob(fi)).Centroid;
+%                             dist(jj) = dot(areaVect, bodyVect);
+%                         end
+%                         [maxd, maxi] = max(dist); %the maximum distance and ind along tail-body vector of each blob  
+%                         noseblob(ii) = maxi; 
+%                          % The nose is the farthest along vector
+%                     end
+%                 end
+%                 if ~isnan(noseblob(ii))
+%                     nosePos(ii,:) = this.areas(fi,noseblob(ii)).Centroid;
+%                 end
+%             end
+%             % putting in a maximum distance criterion of 50 px away from last frame
+%             %maximum instantanous velocity
+%             max_vel = 1200; %px/sec = distance*frame rate
+%             dists = diff(nosePos,1,1);
+%             dists = sqrt(sum(dists.^2,2));
+%             toofar = dists*this.frameRate > max_vel;
+%             nosePos(toofar,:) = NaN*zeros(sum(toofar), 2);
+%             
             %let's assign the vectors
             this.nosePos(frames,:) = nosePos;
             this.noseblob(frames) = noseblob;
