@@ -714,9 +714,9 @@ classdef MouseTracker < handle
             % Assigns unique IDs to blobs based on their overlap with past blobs.  If you have a >30% overlap, you are assumed to 
             % be the same blob and therefore get teh same identifier.  If you don't, you get a new one.  
             % Some parameters for assignment:
-            FTF_OL = .5; % The frame-to-frame overlap to be called the same area
-            LOW_OL = .3; % A lower overlap threshold for determining merging
-            MAX_DIST = 7;% The maximum distance to spots can be to autmatically be given same ID.
+            FTF_OL = .2; % The frame-to-frame overlap to be called the same area
+            LOW_OL = .1; % A lower overlap threshold for determining merging
+            MAX_DIST = 14;% The maximum distance to spots can be to autmatically be given same ID.
             
             fi = frame;
             if (frame ~= 1)
@@ -734,12 +734,20 @@ classdef MouseTracker < handle
                         end
                         prev_pos = reshape([prev(oli).Centroid], 2,[])';
                         com_dist = NaN*zeros(size(prev_pos,1),2);
-                        for jj=1:size(prev_pos,1) com_dist(jj,:) = blob.Centroid - prev_pos(jj,:); end
+                        for jj=1:size(prev_pos,1) 
+                            com_dist(jj,:) = blob.Centroid - prev_pos(jj,:); 
+                        end
                         com_dist = sqrt(sum(com_dist.^2, 2));
+                        npx = [prev(oli).Area];
+                        size_diff = abs(npx - blob.Area)/blob.Area;
                         % loop through overlapping blobs in prev frames, looking for the best qualified one
                         % that isn't taken.
                         for jj = 1:length(oli)
-                            if ol_vals(jj) > FTF_OL || com_dist(jj) < MAX_DIST % test if they are similar enough to be considered same
+                            %test if they are similar enough to be considered same
+                            size_good = (size_diff(jj) < 0.5);
+                            dist_good = com_dist(jj) < MAX_DIST;
+                            overlap_good = ol_vals(jj) > FTF_OL;
+                            if ((dist_good + overlap_good) >= 1) && size_good
                                 if sum(matched == oli(jj))<1 % is that ID already in this frame?
                                     matched(ii) = oli(jj);
                                 end

@@ -935,7 +935,7 @@ classdef MouseTrackerKF < MouseTracker
                     tailCOM(ii,:) = this.areas(ftp(ii), taili).Centroid;
                 end
                 tailV = tailCOM - this.bodyCOM(ftp,:); %vector towards the tail
-                [theta, rho] = cart2pol(tailV(:,1), tailV(:,2));
+                [theta, ~] = cart2pol(tailV(:,1), tailV(:,2));
                 %we want these to be close, the opposite of the tail vector and the orientation
                 od = circularDistance(this.bodyOrient(ftp), theta+pi); 
                 dif = abs(od) > pi/2;  % these estimates are way off, so rotate them 180deg

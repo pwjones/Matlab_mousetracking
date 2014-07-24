@@ -22,7 +22,7 @@ function varargout = reviewTracking(varargin)
 
 % Edit the above text to modify the response to help reviewTracking
 
-% Last Modified by GUIDE v2.5 22-Nov-2013 16:48:35
+% Last Modified by GUIDE v2.5 23-Jul-2014 16:58:47
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -64,7 +64,7 @@ else
 end
 % get the frames to zero in on
 frames = 1:mt.nFrames;
-handles.distThresh = 8;
+handles.distThresh = 10;
 handles.jumpFrames = handles.tracker.findNoseJumps(handles.distThresh, frames);
 if (isempty(handles.jumpFrames))
     handles.jumpFrames = 1;
@@ -112,6 +112,9 @@ switch evt.Key
             nf = 1;
         end
         handles = changeFrame(hObject, handles, nf);
+    case 'slash'
+        propogate_btn_Callback(hObject, evt, handles);
+        handles = changeFrame(hObject, handles, cf);
 end
 guidata(hObject, handles);
 
@@ -129,6 +132,7 @@ handles.currFrame = frame;
 axes(handles.im_ax);
 cla(handles.im_ax); %clears the axis
 handles.tracker.showFrame(handles.currFrame, handles.dispType, []);
+line('Parent', handles.im_ax, 'Xdata', handles.tracker.nosePos(:,1), 'Ydata', handles.tracker.nosePos(:,2), 'Marker', 'none', 'Color', 'c');
 % In order to register clicks, must set the ButtonDownFcn of the objects plotted
 child_h = get(gca, 'Children');
 for ii = 1:length(child_h)
@@ -167,7 +171,7 @@ function varargout = reviewTracking_OutputFcn(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 
 % Get default command line output from handles structure
-varargout{1} = handles.output;
+varargout{1} = handles.tracker;
 
 
 
@@ -369,4 +373,38 @@ function prop_thresh_edit_CreateFcn(hObject, eventdata, handles)
 %       See ISPC and COMPUTER.
 if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
+end
+
+
+% --- Executes on button press in followingGaps_btn.
+function followingGaps_btn_Callback(hObject, eventdata, handles)
+% hObject    handle to followingGaps_btn (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+paths = cat(1, handles.tracker.paths(1).PixelList, handles.tracker.paths(2).PixelList);
+bodyCOM = handles.tracker.bodyCOM;
+dm = ipdm(paths,bodyCOM);
+min_dist = min(dm);
+close = min_dist < 30;
+missing = isnan(handles.tracker.nosePos(:,1));
+handles.missing_nose_inds = find(close(:) & missing(:));
+handles.missing_i = 1;
+if ~isempty(handles.missing_nose_inds)
+    handles = changeFrame(hObject, handles, handles.missing_nose_inds(handles.missing_i));
+    guidata(hObject, handles);
+end
+
+% --- Executes on button press in advance_gap_btn.
+function advance_gap_btn_Callback(hObject, eventdata, handles)
+% hObject    handle to advance_gap_btn (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+if isfield(handles, 'missing_nose_inds') && ~isempty(handles.missing_nose_inds)
+    i = mod(handles.missing_i, length(handles.missing_nose_inds)-1) + 1;
+    newFrame = handles.missing_nose_inds(i);
+    handles.missing_i = i;
+    handles = changeFrame(hObject, handles, newFrame);
+    guidata(hObject, handles);
 end
