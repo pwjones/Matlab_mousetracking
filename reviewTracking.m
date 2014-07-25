@@ -22,7 +22,7 @@ function varargout = reviewTracking(varargin)
 
 % Edit the above text to modify the response to help reviewTracking
 
-% Last Modified by GUIDE v2.5 23-Jul-2014 16:58:47
+% Last Modified by GUIDE v2.5 25-Jul-2014 11:36:11
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -115,6 +115,7 @@ switch evt.Key
     case 'slash'
         propogate_btn_Callback(hObject, evt, handles);
         handles = changeFrame(hObject, handles, cf);
+
 end
 guidata(hObject, handles);
 
@@ -239,6 +240,24 @@ newFrame = max(handles.currFrame-10, 1);
 handles = changeFrame(hObject, handles, newFrame);
 guidata(hObject, handles);
 
+% --- Executes on button press in adv50_btn.
+function adv50_btn_Callback(hObject, eventdata, handles)
+% hObject    handle to adv50_btn (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+newFrame = min(handles.currFrame+50, handles.tracker.nFrames);
+handles = changeFrame(hObject, handles, newFrame);
+guidata(hObject, handles);
+
+% --- Executes on button press in back50_btn.
+function back50_btn_Callback(hObject, eventdata, handles)
+% hObject    handle to back50_btn (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+newFrame = max(handles.currFrame-50, 1);
+handles = changeFrame(hObject, handles, newFrame);
+guidata(hObject, handles);
+
 
 % --- Executes on button press in next_jump_btn.
 function next_jump_btn_Callback(hObject, eventdata, handles)
@@ -318,7 +337,6 @@ function save_btn_Callback(hObject, eventdata, handles)
 % hObject    handle to save_btn (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-
 handles.tracker.save();
 
 
@@ -352,8 +370,6 @@ handles.tracker.propogateNosePosition(currFrame);
 %     end
 % end
 
-
-
 function prop_thresh_edit_Callback(hObject, eventdata, handles)
 % hObject    handle to prop_thresh_edit (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
@@ -376,35 +392,6 @@ if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgr
 end
 
 
-% --- Executes on button press in followingGaps_btn.
-function followingGaps_btn_Callback(hObject, eventdata, handles)
-% hObject    handle to followingGaps_btn (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
 
-paths = cat(1, handles.tracker.paths(1).PixelList, handles.tracker.paths(2).PixelList);
-bodyCOM = handles.tracker.bodyCOM;
-dm = ipdm(paths,bodyCOM);
-min_dist = min(dm);
-close = min_dist < 30;
-missing = isnan(handles.tracker.nosePos(:,1));
-handles.missing_nose_inds = find(close(:) & missing(:));
-handles.missing_i = 1;
-if ~isempty(handles.missing_nose_inds)
-    handles = changeFrame(hObject, handles, handles.missing_nose_inds(handles.missing_i));
-    guidata(hObject, handles);
-end
 
-% --- Executes on button press in advance_gap_btn.
-function advance_gap_btn_Callback(hObject, eventdata, handles)
-% hObject    handle to advance_gap_btn (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
 
-if isfield(handles, 'missing_nose_inds') && ~isempty(handles.missing_nose_inds)
-    i = mod(handles.missing_i, length(handles.missing_nose_inds)-1) + 1;
-    newFrame = handles.missing_nose_inds(i);
-    handles.missing_i = i;
-    handles = changeFrame(hObject, handles, newFrame);
-    guidata(hObject, handles);
-end
