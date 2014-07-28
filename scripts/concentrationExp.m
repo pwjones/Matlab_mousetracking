@@ -3,7 +3,8 @@
 %% Sets vars and loads the dataset %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %concentrationDataList2x; % this script contains the mouse and file names to be included in the analysis.
 %concentrationDataList10x;
-concentrationDataList3;
+%concentrationDataList3;
+concentrationDataList4;
 %cntnapDataList;
 %spring14CohortList;
 base_folder = VIDEO_ROOT;
@@ -32,8 +33,8 @@ end
 %popNoseTraj(perMouseData(4:6), ctl_trials(4:6), {[0 0 0], [1 0 0], [0 0 1]}, []);
 
 %% Nose position CDF while following
-nMice = 2;
-nConc = 3;
+%nMice = 2;
+%nConc = 3;
 nRows = ceil(sqrt(nMice));
 fh = figure; hold on;
 for jj = 1:nMice
@@ -46,7 +47,7 @@ for jj = 1:nMice
     end
     figure(fh);
     ah = subplot(nRows, nRows, jj); %square, many panels
-    plotDistanceHistComparison(rew{1},rew{2}, rew{3}, dist{1}, following_thresh, '', ah);
+    plotDistanceHistComparison(rew{1},rew{2}, rew{3}, rew{4}, following_thresh, '', ah);
     axes(ah); title(mouse_names{ii});
 end
 
@@ -88,10 +89,10 @@ end
 %% Plot the time on trail over time.
 figure; ah1 = axes; hold on;
 xlabel('Trial #','FontSize', 18);
-ylabel('% Time Following Rewarded Trail','FontSize', 18);
+ylabel('% Time on Trail','FontSize', 18);
 figure; ah2 = axes; hold on;
 xlabel('Trial #','FontSize', 18);
-ylabel('% Time on Trail','FontSize', 18);
+ylabel('% Time Following Rewarded Trail','FontSize', 18);
 figure; ah3 = axes; hold on;
 xlabel('Concentration','FontSize', 18);
 ylabel('Prop Following Rewarded','FontSize', 18);
@@ -100,19 +101,21 @@ nRows = ceil(sqrt(nMice));
 filtn = 3; boxcar = ones(1,filtn)./filtn; %define the averaging filter kernel
 mean_prop_follow = []; std_prop_follow = []; n_prop_follow = [];
 cl = {[0 0 1], [0 1 0], [0 0 0]}; offset = [-.05 .05];
+rew_colors = blackGradColormap([0 1 0], nConc+1); rew_colors = rew_colors(2:end,:);
+dist_colors = blackGradColormap([1 0 0], nConc+1); dist_colors = dist_colors(2:end,:);
 for jj = 1:nMice
     for kk=1:nConc
         ii= (jj-1)*nConc + (kk-1) + 1;
         %subplot(nRows, nRows, ii); %square, many panels
         nTrials = length(perMouseData(ii).rew_dists);
-        plot(ah1, perMouseData(ii).rew_prop*100, 'Color', [0 .8 0]); hold on;
-        plot(ah1, perMouseData(ii).dist_prop*100, 'r'); hold on;
+        plot(ah1, perMouseData(ii).rew_prop*100, 'Color', rew_colors(kk,:)); hold on;
+        plot(ah1, perMouseData(ii).dist_prop*100, 'Color', dist_colors(kk,:)); hold on;
         % Let's also do a slightly different measure - ratio of following rewarded/total
-        propFollowing = perMouseData(ii).rew_prop./(perMouseData(ii).rew_prop+perMouseData(ii).dist_prop);
-        mean_prop_follow(kk,jj) = nanmean(propFollowing); std_prop_follow(kk,jj) = nanstd(propFollowing);
+        propTimeFollowingRew = perMouseData(ii).rew_prop./(perMouseData(ii).rew_prop+perMouseData(ii).dist_prop);
+        mean_prop_follow(kk,jj) = nanmean(propTimeFollowingRew); std_prop_follow(kk,jj) = nanstd(propTimeFollowingRew);
         n_prop_follow(kk,jj) = nTrials;
-        plot(ah2, propFollowing*100, 'Color', [0 .8 0]); hold on;
-        plot(ah3, (kk+offset(jj))*ones(nTrials,1), propFollowing, '.', 'Color', cl{jj});
+        plot(ah2, propTimeFollowingRew*100, 'Color', rew_colors(kk,:)); hold on;
+        plot(ah3, (kk+offset(jj))*ones(nTrials,1), propTimeFollowingRew, '.', 'Color', cl{jj});
         samps_cut = floor(length(boxcar)/2);
         vi = (1+samps_cut):(length(perMouseData(ii).rew_prop)-samps_cut)
         xl = length(vi)+samps_cut;
@@ -123,10 +126,10 @@ for jj = 1:nMice
         dist_prop_filt = conv(perMouseData(ii).dist_prop, boxcar,'valid');
         %vi = (1+samps_cut):(samps_cut+length(rew_prop_filt));
         %flh = plot(vi, fake_prop_filt*100,'LineWidth',2, 'Color', [.25 .25 .25]);
-        plot(ah1, vi, rew_prop_filt*100, 'Color', [0 .8 0], 'LineWidth',3);
-        plot(ah1, vi, dist_prop_filt*100, 'r', 'LineWidth',3);
+        plot(ah1, vi, rew_prop_filt*100, 'Color', rew_colors(kk,:), 'LineWidth',3);
+        plot(ah1, vi, dist_prop_filt*100, 'Color', dist_colors(kk,:), 'LineWidth',3);
         set(ah1, 'TickDir','out', 'fontsize', 16);
-        plot(ah2, vi(:), (rew_prop_filt./(rew_prop_filt+dist_prop_filt))*100, 'Color', 'g', 'LineWidth',3);
+        plot(ah2, vi(:), (rew_prop_filt./(rew_prop_filt+dist_prop_filt))*100, 'Color', rew_colors(kk,:), 'LineWidth',3);
         set(ah2, 'TickDir','out', 'fontsize', 16);
     end
 end
@@ -137,40 +140,79 @@ for jj=1:nMice
     addErrorBars(ah3, 1:nConc, mean_prop_follow(:,jj), std_prop_follow(:,jj)./sqrt(n_prop_follow(:,jj)), cl{jj}, .1);
 end
 
+%% Plotting the percent of the trail explored in each case 
+maxtrial = 12;
+nMice = 2; nConc = 4;
+propAreaFollowedRatio = NaN(maxtrial, nMice*nConc);
+propTimeFollowedRatio = NaN(maxtrial, nMice*nConc);
+for jj = 1:nMice
+    for kk=1:nConc
+       ii= (jj-1)*nConc + (kk-1) + 1;
+       pmd = perMouseData(ii);
+       g(ii) = ii; %group variable for box plot
+       conc(ii) = kk;
+       n = length(pmd.rew_prop);
+       propTimeFollowedRatio(1:length(pmd.rew_prop),ii) = pmd.rew_prop ./ (pmd.dist_prop + pmd.rew_prop);
+       propAreaFollowedRatio(1:length(pmd.rew_propFollowed),ii) = pmd.rew_propFollowed ./ (pmd.dist_propFollowed + pmd.rew_propFollowed);
+    end
+end
+% plotting measures of the area of trail followed in each case
+figure;
+boxplot(propAreaFollowedRatio, g, 'notch', 'on');
+figure;
+conc = reshape(conc, nConc, []);
+meanAreaFollowedRatio = reshape(nanmean(propAreaFollowedRatio)', nConc, []);
+semAreaFollowedRatio = reshape(nanstd(propAreaFollowedRatio)'./n, nConc, []);
+errorbar(conc, meanAreaFollowedRatio, semAreaFollowedRatio);
+xlabel('Concentration'); ylabel('Area of Rewared Trial Followed/ Area all trails followed');
+%plotting measures of the time following the correct trail
+figure;
+boxplot(propTimeFollowedRatio, g, 'notch', 'on');
+figure;
+conc = reshape(conc, nConc, []);
+meanTimeFollowedRatio = reshape(nanmean(propTimeFollowedRatio)', nConc, []);
+semTimeFollowedRatio = reshape(nanstd(propTimeFollowedRatio)'./n, nConc, []);
+errorbar(conc, meanTimeFollowedRatio, semTimeFollowedRatio);
+ xlabel('Concentration'); ylabel('% Following time on Rewarded trail');
+
 %% Plotting the area of trail followed as a rate
 % This gives a measure of diligence in trail following
 % This is the most similar to percentage of time on trail, but is based specifically on the amount of
 % trail the animal covers.
 figure; hold on;
 title('Trail Areas');
-nMice = length(perMouseData);
-nRows = ceil(sqrt(nMice));
-for ii=1:nMice
-   %subplot(nRows, nRows, ii); %square, many panels
-   nTrials = length(perMouseData(ii).rew_dists);
-   rew_dist = []; distract_dist = []; movie_time = [];
-   for jj = 1:nTrials
-      %followingDists = perMouseData(ii).rew_propFollowed(jj);
-      movie_time(jj) = perMouseData(ii).total_frames(jj) ./ perMouseData(ii).frame_rate(jj);
-      rew_dist(jj) = perMouseData(ii).rew_trail_area(jj)*perMouseData(ii).rew_propFollowed(jj);
-      %followingDists = perMouseData(ii).distract_dists{jj};
-      distract_dist(jj) = perMouseData(ii).dist_trail_area(jj)*perMouseData(ii).dist_propFollowed(jj);   
-   end
-   x = 1:nTrials;
-   tt = train_trials{ii};
-   rew_dist = rew_dist./movie_time; distract_dist = distract_dist./movie_time; %Make them rates
-   plot(x(tt),rew_dist(tt), 'g-', 'LineWidth', .5); hold on;
-   plot(x(tt),distract_dist(tt), 'r-', 'LineWidth', .5); hold on;
-   vi = (1+samps_cut):(length(rew_dist)-samps_cut);
-   rew_dist_filt = conv(rew_dist, boxcar,'valid');
-   distract_dist_filt = conv(distract_dist, boxcar,'valid');
-   plot(vi, rew_dist_filt, 'g-', 'LineWidth', 3); hold on;
-   plot(vi, distract_dist_filt, 'r-', 'LineWidth', 3); hold on;
-   xlabel('Trial Number','FontSize', 14); ylabel('Trail Area Following Rate, mm^2/sec','FontSize', 14);
-   title(mouse_names{ii});
-   set(gca, 'TickDir', 'out', 'FontSize', 12)
-   %ylim([0 1000]);
+rew_colors = blackGradColormap([0 1 0], nConc+1); rew_colors = rew_colors(2:end,:);
+dist_colors = blackGradColormap([1 0 0], nConc+1); dist_colors = dist_colors(2:end,:);
+for ll = 1:nMice
+    for kk=1:nConc
+        ii= (ll-1)*nConc + (kk-1) + 1;
+        %subplot(nRows, nRows, ii); %square, many panels
+        nTrials = length(perMouseData(ii).rew_dists);
+        rew_dist = []; distract_dist = []; movie_time = [];
+        for jj = 1:nTrials
+            %followingDists = perMouseData(ii).rew_propFollowed(jj);
+            movie_time(jj) = perMouseData(ii).total_frames(jj) ./ perMouseData(ii).frame_rate(jj);
+            rew_dist(jj) = perMouseData(ii).rew_trail_area(jj)*perMouseData(ii).rew_propFollowed(jj);
+            %followingDists = perMouseData(ii).distract_dists{jj};
+            distract_dist(jj) = perMouseData(ii).dist_trail_area(jj)*perMouseData(ii).dist_propFollowed(jj);
+        end
+        x = 1:nTrials;
+        tt = train_trials{ii};
+        rew_dist = rew_dist./movie_time; distract_dist = distract_dist./movie_time; %Make them rates
+        plot(x(tt),rew_dist(tt), '-', 'LineWidth', .5, 'Color', rew_colors(kk,:)); hold on;
+        plot(x(tt),distract_dist(tt), '-', 'LineWidth', .5, 'Color', dist_colors(kk,:)); hold on;
+        vi = (1+samps_cut):(length(rew_dist)-samps_cut);
+        rew_dist_filt = conv(rew_dist, boxcar,'valid');
+        distract_dist_filt = conv(distract_dist, boxcar,'valid');
+        plot(vi, rew_dist_filt, '-', 'LineWidth', 3, 'Color', rew_colors(kk,:)); hold on;
+        plot(vi, distract_dist_filt, '-', 'LineWidth', 3, 'Color', dist_colors(kk,:)); hold on;
+        xlabel('Trial Number','FontSize', 14); ylabel('Trail Area Following Rate, mm^2/sec','FontSize', 14);
+        title(mouse_names{ii});
+        set(gca, 'TickDir', 'out', 'FontSize', 12)
+        %ylim([0 1000]);
+    end
 end
+
 
 %% Let's calculate some distance dependent measures
 for jj = 1:length(perMouseData)
@@ -236,9 +278,10 @@ xlabel('Trial #', 'FontSize', 14); ylabel('Median Following Distance (px)', 'Fon
 %% Mouse velocities as they are following the trail
 mm_conv = 1.16; %mm/px linear
 figure; nva = axes; hold on;
-%figure; bva = axes; hold on;
-colors = {[0 0 0], [1 0 0], [0 0 1], [0 1 0]};
+max_l = 0;
+colors = blackGradColormap([0 1 0], nConc+1); colors = colors(2:end,:);
 for jj = 1:length(perMouseData)
+    conc_i = mod(jj-1, nConc)+1;
     bodyVel = []; noseVel = [];
     for kk = 1:length(perMouseData(jj).body_vel)
         for ll= 1:length(perMouseData(jj).body_vel{kk})
@@ -252,15 +295,15 @@ for jj = 1:length(perMouseData)
     velThresh = 10;
     fi = noseVel >= velThresh;
     noseVel = noseVel(fi);
-    %[yv, bins] = hist(bodyVel, 200);
-    %plot(bva, bins, yv, 'Color', colors{mod(jj-1,length(colors)-1)+1}, 'LineWidth',2);
-    %[yv, bins] = hist(noseVel, 200);
-    %plot(nva, bins, yv, 'Color', colors{mod(jj-1,length(colors)-1)+1}, 'LineWidth',2);
-    %axes(bva);
-    %plotEmpiricalCDF({bodyVel}, .1, {colors{mod(jj-1,length(colors)-1)+1}}, '-', bva);
     axes(nva);
-    plotEmpiricalCDF({noseVel}, 1, {colors{mod(jj-1,length(colors)-1)+1}}, '-', nva);
-    %plot(bva, [1 2 3 4 5; 1 2 3 4 5], [0 0 0 0 0; 1 1 1 1 1], '--k');
+    plotEmpiricalCDF({noseVel}, 1, {colors(conc_i,:)}, '-', nva);
+    allNoseVel{jj} = noseVel;
+    max_l = max(length(noseVel), max_l);
+    median_noseVel(jj) = nanmedian(noseVel);
+    conc(jj) = conc_i;
 end
-%plot(bva, [1 2 3 4 5; 1 2 3 4 5], [0 0 0 0 0; 1000 1000 1000 1000 1000], '--k');
-%plot(nva, [1 2 3 4 5; 1 2 3 4 5], [0 0 0 0 0; 1000 1000 1000 1000 1000], '--k');
+size(median_noseVel)
+median_noseVel = reshape(median_noseVel, nConc,[]);
+conc = reshape(conc, nConc, []);
+figure;
+plot(conc, median_noseVel, 'o-');

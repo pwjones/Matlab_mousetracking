@@ -345,7 +345,7 @@ classdef MouseTrackerKF < MouseTracker
                 frames = 1:this.nFrames;
             end
             [dists, fframes] = this.distanceOnTrail(frames,1,dist_thresh);
-            this.plotNosePosition(frames); hold on;
+            this.plotPosition(frames); hold on;
             for i=1:size(fframes,1)
                 range = fframes(i,1):fframes(i,2);
                 np = this.nosePos(range, :);
