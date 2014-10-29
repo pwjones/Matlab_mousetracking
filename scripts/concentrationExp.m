@@ -117,7 +117,7 @@ for jj = 1:nMice
         plot(ah2, propTimeFollowingRew*100, 'Color', rew_colors(kk,:)); hold on;
         plot(ah3, (kk+offset(jj))*ones(nTrials,1), propTimeFollowingRew, '.', 'Color', cl{jj});
         samps_cut = floor(length(boxcar)/2);
-        vi = (1+samps_cut):(length(perMouseData(ii).rew_prop)-samps_cut)
+        vi = (1+samps_cut):(length(perMouseData(ii).rew_prop)-samps_cut);
         xl = length(vi)+samps_cut;
         %plot([1 xl], 100*[mean(perMouseData(ii).rew_prop) mean(perMouseData(ii).rew_prop)], 'k--');
         %plot([1 xl], [35 35], '--k'); hold on;
@@ -213,7 +213,6 @@ for ll = 1:nMice
     end
 end
 
-
 %% Let's calculate some distance dependent measures
 for jj = 1:length(perMouseData)
     nfiles = length(perMouseData(jj).rew_prop);
@@ -245,35 +244,6 @@ for jj = 1:length(perMouseData)
     % cell arrays of these things
     
 end
-
-%% Plotting the distance measures
-figure; hold on;
-title('Trail Crossings', 'FontSize', 16);
-for jj = 1:length(perMouseData)
-    hold on;
-    plot(perMouseData(jj).crossing_rates(:,1), 'g', 'LineWidth',.5); hold on; 
-    plot(perMouseData(jj).crossing_rates(:,2), 'r', 'LineWidth',.5);
-    rew_crossingrates_filt = conv(perMouseData(jj).crossing_rates(:,1), boxcar,'valid');
-    dist_crossingrates_filt = conv(perMouseData(jj).crossing_rates(:,2), boxcar,'valid');
-    vi = (1+samps_cut):(samps_cut+length(rew_crossingrates_filt));
-    plot(vi, rew_crossingrates_filt, 'g', 'LineWidth',2); % plot boxcar averaged ones 
-    plot(vi, dist_crossingrates_filt, 'r', 'LineWidth',2);
-    legend({'Rewarded Trail', 'Distracter Trail'});
-    xlabel('Trial #', 'FontSize', 14); ylabel('Trail Crossings per second', 'FontSize', 14);
-end
-
-%% %median distances
-figure; hold on;
-for jj = 1:length(perMouseData)
-    med_dist_filt = [conv( perMouseData(jj).med_dist(:,1), boxcar(:),'valid') conv( perMouseData(jj).med_dist(:,2), boxcar(:),'valid')]; 
-    plot(perMouseData(jj).med_dist(:,1), 'g', 'LineWidth', .5); hold on;
-    plot(perMouseData(jj).med_dist(:,2), 'r', 'LineWidth', .5);
-    vi = (1+samps_cut):(samps_cut+size(med_dist_filt,1));
-    plot(vi, med_dist_filt(:,1), 'g', 'LineWidth', 2); 
-    plot(vi, med_dist_filt(:,2), 'r', 'LineWidth', 2);    
-end
-legend({'Rewarded Trail', 'Distracter Trail'});
-xlabel('Trial #', 'FontSize', 14); ylabel('Median Following Distance (px)', 'FontSize', 14);
 
 %% Mouse velocities as they are following the trail
 mm_conv = 1.16; %mm/px linear

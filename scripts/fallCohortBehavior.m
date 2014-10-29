@@ -7,7 +7,7 @@ base_folder = VIDEO_ROOT;
 following_thresh = 20; %mm
 clear perMouseData;
 
-videoList = listBehavioralVideos(base_folder, folders, mouse_names);
+[videoList, folder_nums] = listBehavioralVideos(base_folder, folders, mouse_names);
 
 s = matlabpool('size');
 if s~=0
@@ -31,7 +31,9 @@ nMice = length(perMouseData);
 nRows = ceil(sqrt(nMice));
 for ii = 1:nMice
     %subplot(nRows, nRows, ii); %square, many panels
-    nTrials = length(perMouseData(ii).rew_dists);
+    %nTrials = length(perMouseData(ii).rew_dists);
+    nTrails = length(folder_nums{ii}); % added 10/14 - want to plot by day rather than by trial
+    
     plot(perMouseData(ii).rew_prop*100, 'g'); hold on;
     plot(perMouseData(ii).dist_prop*100, 'r');
     boxcar = [1 1 1 1 1]./ 5;
@@ -54,6 +56,49 @@ for ii = 1:nMice
     %legend({'Rewarded Trail', 'Distracter Trail'});
     %title('Proportion of Time Following Trails');
 end
+
+%% Plot the time on trail over time - plot by day
+figure; hold on;
+title('Trail Fraction Followed per Day');
+nMice = length(perMouseData);
+nRows = ceil(sqrt(nMice));
+max_days = length(folders);
+for ii = 1:nMice
+    nTrails = length(folder_nums{ii}); % added 10/14 - want to plot by day rather than by trial
+    days = sort(unique(folder_nums{ii})); %the day labels
+    rew_prop = []; dist_prop = [];
+    for jj = 1:length(days)
+        sel = folder_nums{ii} == days(jj); 
+        rew_prop(jj) = nanmean(perMouseData(ii).rew_prop(sel)) * 100;
+        dist_prop(jj) = nanmean(perMouseData(ii).dist_prop(sel)) * 100;
+    end
+    plot(days, rew_prop, 'g-', 'LineWidth', 1); hold on;
+    plot(days, dist_prop, 'r-', 'LineWidth', 1);
+    set(gca, 'TickDir','out', 'fontsize', 16);
+    xlabel('Training Day','FontSize', 18);
+    ylabel('% Time on Trail','FontSize', 18);
+    title(mouse_names{ii});
+    
+    all_days{ii} = days;
+    all_rew_prop{ii} = rew_prop;
+    all_dist_prop{ii} = dist_prop;
+end
+% Now we need to add an overall mean line
+mean_rew_prop = zeros(max_days, 1)*NaN; mean_dist_prop = zeros(max_days, 1)*NaN;
+for ii = 1:max_days
+   rew_prop = zeros(nMice,1) * NaN; dist_prop = zeros(nMice,1) * NaN;
+   for jj = 1:nMice
+      fi = find(all_days{jj} == ii); % find the matching day index for this mouse
+      rew_prop(jj) = all_rew_prop{jj}(fi); % select the rewarded prop corresponding to the day
+      dist_prop(jj) = all_dist_prop{jj}(fi); 
+   end
+   mean_rew_prop(ii) = nanmean(rew_prop);
+   mean_dist_prop(ii) = nanmean(dist_prop);
+end
+plot(1:max_days, mean_rew_prop, 'g-', 'LineWidth', 2);
+plot(1:max_days, mean_dist_prop, 'r-', 'LineWidth', 2);
+
+
 
 %% Let's come up with some distance dependent measures
 for jj = 1:length(perMouseData)

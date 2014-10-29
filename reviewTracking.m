@@ -22,7 +22,7 @@ function varargout = reviewTracking(varargin)
 
 % Edit the above text to modify the response to help reviewTracking
 
-% Last Modified by GUIDE v2.5 25-Jul-2014 11:36:11
+% Last Modified by GUIDE v2.5 22-Oct-2014 08:56:26
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -78,6 +78,7 @@ handles.anatomyFlag = 1;
 handles = changeFrame(hObject, handles, handles.currFrame);
 set(hObject, 'Toolbar', 'figure');
 set(hObject, 'KeyPressFcn', @(hObject, evt)keyResponder(hObject, evt));
+set(gcf, 'KeyPressFcn', @(hObject, evt)keyResponder(hObject, evt));
 % The propogation section
 handles.corrThresh = .6;
 if isempty(mt.blobID) % This is in case there are no blobIDs.  Necessary for easy propogation of changes
@@ -115,7 +116,8 @@ switch evt.Key
     case 'slash'
         propogate_btn_Callback(hObject, evt, handles);
         handles = changeFrame(hObject, handles, cf);
-
+    case 'period'
+        clearNose_btn_Callback(hObject, evt, handles);
 end
 guidata(hObject, handles);
 
@@ -337,6 +339,7 @@ function save_btn_Callback(hObject, eventdata, handles)
 % hObject    handle to save_btn (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
+handles.tracker.computeVelocity([]);
 handles.tracker.save();
 
 
@@ -392,6 +395,13 @@ if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgr
 end
 
 
-
-
-
+% --- Executes on button press in clearNose_btn.
+function clearNose_btn_Callback(hObject, eventdata, handles)
+% hObject    handle to clearNose_btn (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+currFrame = handles.currFrame;
+handles.tracker.nosePos(currFrame, :) = [NaN, NaN];
+handles.tracker.noseblob(currFrame) = NaN;
+handles = changeFrame(hObject, handles, handles.currFrame);
+guidata(hObject, handles);

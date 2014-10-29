@@ -82,8 +82,8 @@ classdef MouseTracker < handle
                     this.videoFN = filename;
                 end
             end
-            if isempty(filename) || ~exist(filename) %a non-complete path was specified, and needs to be chosen
-                movie_folder = '~pwjones/Movies/mouse_training/';
+            if (isempty(filename) || ~exist(filename)) % && ~mclIsNoDisplaySet() %a non-complete path was specified, and needs to be chosen
+                movie_folder = '/Volumes/Alexandria/pwj_data/mouse_training/';
                 [filename, movie_folder] = uigetfile([movie_folder '*.*']);
                 if filename == 0 % the user has canceled the file selection
                     return;

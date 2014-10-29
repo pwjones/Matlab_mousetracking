@@ -5,7 +5,9 @@ classdef MouseTrackerKF < MouseTracker
         p_mouse = .001; %the proportion of pixels that are 
         kf = struct('nstates', {}, 'nob', {}, 's', {});
         mm_conv = 1.16; %mm/px linear
-        fullPaths;
+        fullPaths; %the full detected paths, to be saved if the paths are skeletonized
+        exploredProp; %the proportions of the trails explored at each timepoint
+        trackingStruct; %structure used to save external tracking info
     end
     
     methods
@@ -413,7 +415,55 @@ classdef MouseTrackerKF < MouseTracker
             makeCircColorbar(0,cm,cvals,0);
             set(gca, 'XDir', 'reverse')
         end
-        
+        % ---------------------------------------------------------------------------------------------------
+        function exploredProp = plotFollowingTimecourse(this, threshDist)
+            % function plotFollowingTimecourse(this)
+            %
+            % This function returns the proporation of the trail pixels that the mouse came within a given
+            % distance of, for each video frame.  It's nice because it does show the bouts of following in a 
+            % way that even penalizes the animal for stopping along the trail. It's a  clean way of measuring 
+            % the completeness of his trail exploration.
+            % Algorthmically, this is a similar problem to finding the following segments except reversed.  As
+            % implemented it's SLOW.  Thought for speeding it up is to do it on the full video once, to get the
+            % frames where the animal is within distance of ANY pixel, then do the incremental on only those frames.
+            if (sum(sum(this.exploredProp)) > 0)
+                calculated = 1;
+            else 
+                calculated = 0;
+            end
+            if ~calculated
+                exploredProp = zeros(this.nFrames, 2);
+                this.makePathsSkel();
+                for ii = 1:this.nFrames
+                    if ~mod(ii, 100)
+                        disp('Completed 100 frames');
+                    end
+                    np = this.nosePos(1:ii,:);
+                    nn = ~isnan(np(:,1));
+                    np = np(nn,:);
+                    for trailNum = 1:2
+                        trailPos = this.paths(trailNum).PixelList;
+                        
+                        distm = ipdm(single(np), single(trailPos));
+                        [trailDist, mini] = nanmin(distm, [], 1);
+                        explored = find(trailDist <= threshDist);
+                        npx = length(this.paths(trailNum).PixelIdxList);
+                        exploredProp(ii,trailNum) = length(explored)/npx;
+                    end
+                end
+                this.makePathsFull();
+                this.exploredProp = exploredProp;
+            else
+                exploredProp = this.exploredProp;
+            end
+            % plotting part
+            figure;
+            plot(this.times, this.exploredProp(:,1), 'g','LineWidth', 2); hold on;
+            plot(this.times, this.exploredProp(:,2), 'r','LineWidth', 2); 
+            xlabel('Time (sec)');
+            ylabel('Proportion of the trail explored');
+            
+        end
         % ------------------------------------------------------------------------------------------------------
         function writeMovie(this, filename, movieType, frames, dispCrop)
             % function writeMovie(this, filename, movieType, frames, dispCrop)
@@ -421,7 +471,7 @@ classdef MouseTrackerKF < MouseTracker
             if isempty(frames)
                 frames = 1:this.nFrames;
             end
-            vidWriter = VideoWriter(filename, 'Motion JPEG AVI');
+            vidWriter = VideoWriter(filename);
             open(vidWriter);
             figure;
             for ii=frames
@@ -433,13 +483,16 @@ classdef MouseTrackerKF < MouseTracker
             close(vidWriter);
         end
         
-        % ------------------------------------------------------------------------------------------------------
+        % -------------------------------------------------------------------------------------------------
         function showMovie(this, movieType, frames, varargin)
-            % function showMovie(this, useBinMovie, frameRange)
-            if length(varargin) >=1
+            % function showMovie(this, useBinMovie, frames, dispCrop[OPTIONAL], overlay[OPTIONAL])
+            if nargin >=4
                 dispCrop = varargin{1};
             else
                 dispCrop = [];
+            end
+            if nargin >=5
+                overlayMov = varargin{2};
             end
             fh = figure;
             this.exitMovie = 0;
@@ -452,7 +505,11 @@ classdef MouseTrackerKF < MouseTracker
                 if this.exitMovie
                     break
                 end
-                this.showFrame(fi, movieType, dispCrop);
+                if nargin < 5
+                    this.showFrame(fi, movieType, dispCrop);
+                else
+                    this.showFrame(fi, movieType, dispCrop, overlayMov(:,:,ii));
+                end
                 hold off;
                 pause(1/this.frameRate/1); %faster than the natural framerate due to impatience.
             end
@@ -460,7 +517,19 @@ classdef MouseTrackerKF < MouseTracker
             set(fh, 'WindowKeyPressFcn', '');
         end
         
-        % ------------------------------------------------------------------------------------------------------
+         % ------------------------------------------------------------------------------------------------
+        function showTrackingLogOverlayMovie(this, movieType, frames, varargin)
+            if isfield(this.trackingStruct, 'binMovie')
+                sub = this.trackingStruct.movieSubsample;
+                fi = int32(frames).*sub;
+                varargin{end+1} = this.trackingStruct.binMovie(:,:,fi);
+                showMovie(this, movieType, frames, varargin{:})
+            else
+                disp('You must call readTrackingLog first');
+            end
+        end
+        
+        % -------------------------------------------------------------------------------------------------
         function exitMovieLoop(this, src, event)
             % Function to set a flag internally to exit a movie that is being displayed.
             % It is not used for any other purpose
@@ -1159,6 +1228,7 @@ classdef MouseTrackerKF < MouseTracker
             this.noseblob = NaN*zeros(this.nFrames,1);
             this.bodyOrient = NaN*zeros(this.nFrames, 1);
             this.bodyCOM = NaN*zeros(this.nFrames, 2);
+            this.exploredProp = zeros(this.nFrames, 2);
             %initialize areas - must get these in the correct order too
             tempareas = struct('Area',0, 'Centroid',[0 0],'BoundingBox', [0 0 0 0], 'MajorAxisLength',0,...
                 'MinorAxisLength',0, 'Orientation',0,'Extrema',[0 0 0 0], 'PixelIdxList',[], 'PixelList',[],'Perimeter', 0);
@@ -1400,6 +1470,7 @@ classdef MouseTrackerKF < MouseTracker
                 if isempty(this.paths)
                     noseDist = NaN*zeros(length(frames), 1);
                     vects = NaN*zeros(length(frames), 2);
+                    disp([this.videoFN ': noseDistToTrail']);
                     disp('There must be a detected path to calculate distances');
                 else %make a fake trail
                     nosePos = this.nosePos(frames,:);
@@ -1440,6 +1511,7 @@ classdef MouseTrackerKF < MouseTracker
                 end
             else
                 vects = NaN*zeros(length(frames), 2);
+                disp([this.videoFN ' : noseVectorToTrail']);
                 disp('There must be a detected path to calculate distances');
             end
             
@@ -1669,11 +1741,16 @@ classdef MouseTrackerKF < MouseTracker
         end
             
         % ------------------------------------------------------------------------------------------------------
-        function showFrame(this, framei, movieType, dispCrop)
+        function showFrame(this, framei, movieType, dispCrop, varargin)
             % function showFrame(this, framei, useBinMovie)
             %
             % plots a frame of the movie,
             if isempty(dispCrop) dispCrop = [1 1 this.width this.height]; end
+            if (nargin >= 5)
+                logIm = varargin{1};
+            else
+                logIm = false(this.height, this.width);
+            end
             dbg = 0;
             if strcmp(movieType, 'bin')
                 bf = zeros(this.height, this.width, 'uint8');
@@ -1690,47 +1767,61 @@ classdef MouseTrackerKF < MouseTracker
                     end
                 end
                 pathIm = this.plotPaths()*4;
-                bf = bf+pathIm;
-                imshow(label2rgb(bf, 'cool','k')); hold on;
-                %imshow(bf, [0 0 0; 1 1 1; 1 0 0; 0 0 1; 1 1 1; 1 0 0]); hold on;  
+                bf = bf+pathIm + uint8(logIm)*3;
+                imshow(label2rgb(bf, 'cool','k')); hold on;  
+                %f = label2rgb(bf, 'cool','k');
+                %pos = max(f,3); pos(logIm) = 255;
+                %neg = max(f,3); f; neg(logIm) = 0;
             else
-                %f = mmread(this.videoFN, this.frameRange(framei));
-                %f = this.readFrames(framei);
-                %imshow(f.frames.cdata); 
                 f = this.readMovieSection(framei, movieType);
-                f = this.plotPathsOnFrame(f);
+                f = this.plotPathsOnFrame(f, 1:2, 1);
+                %f = this.gray2rgb(f);
+                %pos = f; pos(logIm) = 255;
+                %neg = f; neg(logIm) = 0;
+                %f = cat(3, neg, neg, pos);
+                %f(:,:,3) = max(1, f(:,:,3)+cast(logIm,'uint8')*255); %not quite sure what I'm doing here
+                %f(:,:,1) = 
                 imshow(f);
-                %imshow(imabsdiff(f.frames.cdata, this.avgFrame));
                 hold on;
             end
             %annotate the image
             if ~isempty(this.areas)
                 hold on;
-                for jj = 1:size(this.COM,3)
-                    plot(this.COM(framei,1,jj), this.COM(framei,2,jj), 'r+', 'MarkerSize', 12, 'LineWidth',1);
-                    ellipse(this.areas(framei,jj).MajorAxisLength/2, this.areas(framei,jj).MinorAxisLength/2, ...
-                            this.orient(framei,jj), this.COM(framei,1,jj),this.COM(framei,2,jj),'r');
-                    text(this.COM(framei,1,jj)+10, this.COM(framei,2,jj), num2str(this.blobID(framei, jj)), 'Color','r', 'FontSize', 14);
-                end
-                line(this.bodyCOM(framei,1), this.bodyCOM(framei,2), 'Marker', 'o', 'Color', 'c','MarkerSize', 12, 'LineWidth',2);
-                    %line(this.areas(framei).Extrema(:,1), this.areas(framei).Extrema(:,2), 'Marker', '.', 'Color', 'c');
-                    %[u, v] = pol2cart(this.orient(framei), this.vel(framei)*.1);
-                    %quiver(this.COM(framei,1), this.COM(framei,2), u,v, 'LineWidth', 2); %plots an orientation arrow
-                if this.tailVisible(framei)
-                    line(this.areas(framei,this.tailblob(framei)).Centroid(1), this.areas(framei,this.tailblob(framei)).Centroid(2), ...
-                        'Marker', 'x', 'Color', 'm','MarkerSize', 12, 'LineWidth',2);
-                end
+%                 for jj = 1:size(this.COM,3)
+%                     plot(this.COM(framei,1,jj), this.COM(framei,2,jj), 'r+', 'MarkerSize', 12, 'LineWidth',1);
+%                     ellipse(this.areas(framei,jj).MajorAxisLength/2, this.areas(framei,jj).MinorAxisLength/2, ...
+%                             this.orient(framei,jj), this.COM(framei,1,jj),this.COM(framei,2,jj),'r');
+%                     text(this.COM(framei,1,jj)+10, this.COM(framei,2,jj), num2str(this.blobID(framei, jj)), 'Color','r', 'FontSize', 14);
+%                 end
+%                 line(this.bodyCOM(framei,1), this.bodyCOM(framei,2), 'Marker', 'o', 'Color', 'c','MarkerSize', 12, 'LineWidth',2);
+%                     %line(this.areas(framei).Extrema(:,1), this.areas(framei).Extrema(:,2), 'Marker', '.', 'Color', 'c');
+%                     %[u, v] = pol2cart(this.orient(framei), this.vel(framei)*.1);
+%                     %quiver(this.COM(framei,1), this.COM(framei,2), u,v, 'LineWidth', 2); %plots an orientation arrow
+%                 if this.tailVisible(framei)
+%                     line(this.areas(framei,this.tailblob(framei)).Centroid(1), this.areas(framei,this.tailblob(framei)).Centroid(2), ...
+%                         'Marker', 'x', 'Color', 'm','MarkerSize', 12, 'LineWidth',2);
+%                 end
                 if (~isnan(this.noseblob(framei)))
                     line(this.areas(framei,this.noseblob(framei)).Centroid(1), this.areas(framei,this.noseblob(framei)).Centroid(2), ...
-                        'Marker', '+', 'Color', 'g','MarkerSize', 12, 'LineWidth',2);
-                    [xv,yv] = pol2cart(this.orient(framei), this.vel(framei));
-                    quiver(this.areas(framei, this.noseblob(framei)).Centroid(1), this.areas(framei,this.noseblob(framei)).Centroid(2), xv, yv, 0);
+                        'Marker', '+', 'Color', 'c','MarkerSize', 8, 'LineWidth',2);
+%                    [xv,yv] = pol2cart(this.orient(framei), this.vel(framei));
+%                    quiver(this.areas(framei, this.noseblob(framei)).Centroid(1), this.areas(framei,this.noseblob(framei)).Centroid(2), xv, yv, 0);
                 end
             end
            set(gca, 'xlim', [dispCrop(1) dispCrop(3)], 'ylim', [dispCrop(2) dispCrop(4)]);
         end
+        %------------------------------------------------------------------
+        function rgbIm = gray2rgb(this, grayIm)
+            rgbIm = cat(3, grayIm, grayIm, grayIm);
+        end
         
-        function pathIm = plotPathsOnFrame(this,inFrame,pathNums)
+        %--------------------------------------------------------------------------------------------
+        function pathIm = plotPathsOnFrame(this,inFrame,pathNums, varargin)
+            if nargin < 4
+                blend = 1;
+            else 
+                blend = varargin{1};
+            end
             pathIm = inFrame;
             if isempty(this.paths)
                 return;
@@ -1751,15 +1842,16 @@ classdef MouseTrackerKF < MouseTracker
                     pi = pathNums(ii);
                     c = color_order(mod(pi-1, 3)+1);
                     layer = pathIm(:,:,c);
-                    layer(this.paths(pi).PixelIdxList) = 200;
+                    orig = layer(this.paths(pi).PixelIdxList);
+                    layer(this.paths(pi).PixelIdxList) = floor((orig*(1-blend) + 255*blend)./2);
                     pathIm(:,:,c) = layer;
                     oc = find(1:3 ~= c);
                     %set the other layers to 0
                     layer = pathIm(:,:,oc(1));
-                    layer(this.paths(pi).PixelIdxList) = 0;
+                    layer(this.paths(pi).PixelIdxList) = floor(orig*((2-blend)/2));
                     pathIm(:,:,oc(1)) = layer;
                     layer = pathIm(:,:,oc(2));
-                    layer(this.paths(pi).PixelIdxList) = 0;
+                    layer(this.paths(pi).PixelIdxList) = floor(orig*((2-blend)/2));
                     pathIm(:,:,oc(2)) = layer;
                 end
             end
@@ -1939,6 +2031,46 @@ classdef MouseTrackerKF < MouseTracker
                 ret_mov = new_mov;
             end
         end
+        
+    % -------------------- Functions dealing with the log file (may not exist) -------------------------------
+    
+        % -------------------------------------------------
+        function readTrackingLog(this, varargin)
+        % function readTrackingLog(varargin)
+        % 
+        % This reads in a log file detailing the tracked segments from another program.  
+        % 
+            % parse input, generate default
+            if nargin >= 2
+                filestr = varargin{1}; % first arg is 'this'
+            else
+                [path, fn, ext] = fileparts(this.videoFN);
+                [basename, rem] = strtok(fn, '_');
+                expr = [basename, '_(.*)-0000'];
+                [matchstart,matchend,tokenindices,matchstring,tokenstring,tokenname,splitstring]= regexp(fn,expr);
+                timestr = tokenstring{1}; 
+                timestr = timestr{1}; %f'ing stupid cell nesting
+                filestr = [path filesep 'trackingLog_' timestr '.txt'];
+            end
+            if ~exist(filestr, 'file')
+                disp('Cannot find the specified log file');
+                return;
+            end
+            trackingStruct = readCCVLog(filestr);
+            this.trackingStruct = trackingStruct;
+        end
+        
+        function drawTrackedAreas(this, framei, ah)
+            %function drawTrackedAreas(framei)
+            if isempty(ah)
+                ah = gca;
+            end
+            for i=1:this.trackingStruct.frameInfo(framei).nAreas
+                area = this.trackingStruct.frameInfo(framei).areas(i);
+                hold on;
+                plot(ah, area.PixelList(:,1), area.PixelList(:,2), '.-r', 'LineWidth', 2);
+            end
+        end
 
     end %Methods
     
@@ -2007,9 +2139,7 @@ classdef MouseTrackerKF < MouseTracker
                 movieType = -1;
             end
         end
-        
-        
-                
+              
         
     end % methods - private
 end %classdef
