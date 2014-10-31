@@ -167,6 +167,7 @@ for ii = 1:nMice
 
     % select parts of behavior where mouse is decelerating
     sel = all_NA{ii} < 0;
+    sel = true(length(all_NA{ii}),1);
     
     plot(all_NV_filt{ii}(sel), all_SF{ii}(sel), 'k.', 'MarkerSize', 12);
      

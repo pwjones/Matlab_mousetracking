@@ -136,7 +136,7 @@ classdef MouseTrackerKF < MouseTracker
             end
             vel_vect = gaussianFilter(vel_vect, filt_std, 'conv');
             vel_vect = mm_conv * this.frameRate * vel_vect;  %convert to mm/sec
-            [cm cinds] = getIndexedColors('jet', vel_vect, 0);
+            [cm cinds] = getIndexedColors('jet', vel_vect, 0, [0 400]);
             
             % unfortunately, I haven't been able to figure out an easier way to do colormapping of points plotted over
             % a B&W image, without the points and the image sharing the same colormap.  So, here I'm just plotting every
@@ -1384,7 +1384,7 @@ classdef MouseTrackerKF < MouseTracker
             for ii = 1:length(this.paths)
                 path = this.paths(ii);
                 pathIm(path.PixelIdxList) = 1;
-                pathIm = imfill(pathIm,'holes');
+                %pathIm = imfill(pathIm,'holes');
             end
         end
         % ------------------------------------------------------------------------------------------------------
@@ -1441,6 +1441,7 @@ classdef MouseTrackerKF < MouseTracker
             end 
             eimage = false(this.height, this.width);
             eimage(this.paths(pathNum).PixelIdxList) = 1;
+            eimage = imclose(eimage,strel('disk',3)); 
             eimage = imfill(eimage, 'holes'); %We want to fill in the holes in the detected path
             e = regionprops(eimage,props); %now just redetect.
             this.paths(pathNum) = mergeAreas(e);
@@ -1568,7 +1569,18 @@ classdef MouseTrackerKF < MouseTracker
             crossings = crossings(ci);
             dir = dists(crossings) < 0;
             dists = dists(crossings);
-              
+            
+            % remove the duplicates that may arise from very close on the
+            % trail behavior (only count first crossing if there are
+            % multiple crossings close by and near the trail
+            if ~isempty(crossings)
+                sep = diff(crossings);
+                sep = [100; sep];
+                sel = sep > 1;
+                crossings = crossings(sel);
+                dir = dir(sel);
+                dists = dists(sel);
+            end
         end    
         
         % ------------------------------------------------------------------------------------------------------

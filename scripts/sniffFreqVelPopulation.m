@@ -4,7 +4,7 @@
 clear perMouseData;
 base_folder = VIDEO_ROOT;
 mouse_names = {'19439', '21413', '971', '1080'};
-folders = {'140401', '140404', '140409', '141016', '141017', '141020', '141021', '141022'};
+folders = {'140401', '140404', '140409', '141016', '141017', '141020', '141021', '141022', '141024'};
 nMice = length(mouse_names);
 following_thresh = 20; %mm
 mov_thresh = 50; %mm/sec
@@ -15,6 +15,7 @@ for ii = 1:nMice
    for jj = 1:length(folders)
         saved_file = [base_folder filesep folders{jj} filesep folders{jj} '_' mouse_names{ii} '.mat'];
         if exist(saved_file, 'file')
+            disp(['Loading: ' saved_file]);
             load(saved_file);
             
             [SF_temp, NV_temp, NV_filt_temp, NA_temp] = correlateSniffFreqVelocity(exp);

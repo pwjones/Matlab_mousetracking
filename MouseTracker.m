@@ -44,7 +44,8 @@ classdef MouseTracker < handle
         % trigger (eg physiology acquision system) in order to verify that the video is properly synced, and if it 
         % has skipped frames, to correct the error post hoc. If this is not in use, set the
         % fcArea to empty and it'll not be utilized.
-        fcArea = [1221, 959, 1266, 999]; %position in frame, [left, top, right, bottom]
+        %fcArea = [1217, 959, 1262, 999]; %position in frame, [left, top, right, bottom]
+        fcArea = [1206, 954, 1248, 999]
         fcLum = []; % The actual values of the LED area - sum over the area used, normalized.
         fcPeriod = 50; %the period of the repeating pattern, enables easy analysis of inter cyle variability
         syncInd = []; %this is a vector of indices for each frame corresponding to an external trigger
@@ -570,6 +571,23 @@ classdef MouseTracker < handle
             end 
         end
         
+        function updateFCLum(this)
+           cycles = ceil(this.nFrames/this.framesPerSeg);
+           endFrame = 0;
+           for ii = 1:cycles
+               beginFrame = endFrame + 1;
+               endFrame = min(beginFrame + this.framesPerSeg - 1, this.nFrames);
+               rawArray = this.readFrames([beginFrame endFrame], 'continuous');
+               if ~isempty(this.fcArea) % excludes the area used for counting frames
+                    fca = this.fcArea;
+                    fc_mov = rawArray(fca(2):fca(4), fca(1):fca(3), :);
+                    fc_val = squeeze(sum(sum(fc_mov,1),2));
+               else
+                    fc_val = NaN*ones(length(beginFrame:endFrame), 1);
+               end
+               this.fcLum(beginFrame:endFrame) = fc_val;
+           end
+        end
     %end
     
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%% PRIVATE METHODS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
