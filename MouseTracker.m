@@ -47,7 +47,7 @@ classdef MouseTracker < handle
         %fcArea = [1217, 959, 1262, 999]; %position in frame, [left, top, right, bottom]
         fcArea = [1206, 954, 1248, 999]
         fcLum = []; % The actual values of the LED area - sum over the area used, normalized.
-        fcPeriod = 50; %the period of the repeating pattern, enables easy analysis of inter cyle variability
+        fcPeriod = 60; %the period of the repeating pattern, enables easy analysis of inter cyle variability
         syncInd = []; %this is a vector of indices for each frame corresponding to an external trigger
         % Want to assign an ID to each identified area
         blob_num = 1;
@@ -567,7 +567,7 @@ classdef MouseTracker < handle
         % Check if frame(s) is(are) missing
             missing = 0;
             if ~isempty(this.fcArea)
-                missing = isMissingFrame(this.fcLum, this.fcPeriod, .01); %functionality outsourced
+                missing = isMissingFrame(this.fcLum, this.fcPeriod, .02); %functionality outsourced
             end 
         end
         
@@ -575,6 +575,7 @@ classdef MouseTracker < handle
            cycles = ceil(this.nFrames/this.framesPerSeg);
            endFrame = 0;
            for ii = 1:cycles
+               disp(sprintf('Starting segment %d of %d', ii, cycles));
                beginFrame = endFrame + 1;
                endFrame = min(beginFrame + this.framesPerSeg - 1, this.nFrames);
                rawArray = this.readFrames([beginFrame endFrame], 'continuous');

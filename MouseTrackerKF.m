@@ -1799,23 +1799,23 @@ classdef MouseTrackerKF < MouseTracker
             %annotate the image
             if ~isempty(this.areas)
                 hold on;
-%                 for jj = 1:size(this.COM,3)
-%                     plot(this.COM(framei,1,jj), this.COM(framei,2,jj), 'r+', 'MarkerSize', 12, 'LineWidth',1);
-%                     ellipse(this.areas(framei,jj).MajorAxisLength/2, this.areas(framei,jj).MinorAxisLength/2, ...
-%                             this.orient(framei,jj), this.COM(framei,1,jj),this.COM(framei,2,jj),'r');
-%                     text(this.COM(framei,1,jj)+10, this.COM(framei,2,jj), num2str(this.blobID(framei, jj)), 'Color','r', 'FontSize', 14);
-%                 end
-%                 line(this.bodyCOM(framei,1), this.bodyCOM(framei,2), 'Marker', 'o', 'Color', 'c','MarkerSize', 12, 'LineWidth',2);
-%                     %line(this.areas(framei).Extrema(:,1), this.areas(framei).Extrema(:,2), 'Marker', '.', 'Color', 'c');
-%                     %[u, v] = pol2cart(this.orient(framei), this.vel(framei)*.1);
-%                     %quiver(this.COM(framei,1), this.COM(framei,2), u,v, 'LineWidth', 2); %plots an orientation arrow
-%                 if this.tailVisible(framei)
-%                     line(this.areas(framei,this.tailblob(framei)).Centroid(1), this.areas(framei,this.tailblob(framei)).Centroid(2), ...
-%                         'Marker', 'x', 'Color', 'm','MarkerSize', 12, 'LineWidth',2);
-%                 end
+                for jj = 1:size(this.COM,3)
+                    plot(this.COM(framei,1,jj), this.COM(framei,2,jj), 'r+', 'MarkerSize', 12, 'LineWidth',1);
+                    ellipse(this.areas(framei,jj).MajorAxisLength/2, this.areas(framei,jj).MinorAxisLength/2, ...
+                            this.orient(framei,jj), this.COM(framei,1,jj),this.COM(framei,2,jj),'r');
+                    text(this.COM(framei,1,jj)+10, this.COM(framei,2,jj), num2str(this.blobID(framei, jj)), 'Color','r', 'FontSize', 14);
+                end
+                line(this.bodyCOM(framei,1), this.bodyCOM(framei,2), 'Marker', 'o', 'Color', 'c','MarkerSize', 12, 'LineWidth',2);
+                    %line(this.areas(framei).Extrema(:,1), this.areas(framei).Extrema(:,2), 'Marker', '.', 'Color', 'c');
+                    %[u, v] = pol2cart(this.orient(framei), this.vel(framei)*.1);
+                    %quiver(this.COM(framei,1), this.COM(framei,2), u,v, 'LineWidth', 2); %plots an orientation arrow
+                if this.tailVisible(framei)
+                    line(this.areas(framei,this.tailblob(framei)).Centroid(1), this.areas(framei,this.tailblob(framei)).Centroid(2), ...
+                        'Marker', 'x', 'Color', 'm','MarkerSize', 12, 'LineWidth',2);
+                end
                 if (~isnan(this.noseblob(framei)))
                     line(this.areas(framei,this.noseblob(framei)).Centroid(1), this.areas(framei,this.noseblob(framei)).Centroid(2), ...
-                        'Marker', '+', 'Color', 'c','MarkerSize', 8, 'LineWidth',2);
+                        'Marker', '+', 'Color', 'g','MarkerSize', 8, 'LineWidth',2);
 %                    [xv,yv] = pol2cart(this.orient(framei), this.vel(framei));
 %                    quiver(this.areas(framei, this.noseblob(framei)).Centroid(1), this.areas(framei,this.noseblob(framei)).Centroid(2), xv, yv, 0);
                 end

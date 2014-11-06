@@ -18,15 +18,31 @@ end
 
 %%
 % Let's plot  
-vidi = 1:length(vids);
-%vidi = 1:2;
-%vidi = 24:28;
+vidi = 1:length(exp.vids);
 for ii = 1:length(vidi)
     %exp.vids(ii).plotNosePosition([]);
-    %vids(ii).plotPosition([]);
-    vids(ii).plotFollowing([],15,'');
+    exp.vids(ii).plotNosePosition([]);
+    %vids(ii).plotFollowing([],15,'');
     %exp.vids(ii).plotPosition([exp.resp(ii).sniffFrames(exp.resp(ii).vidSniffs)], ah, 0, 'b', '.');
 end
+
+%% Reset the fcArea
+vidi = 1:length(exp.vids);
+for ii = 1:length(vidi)
+    exp.vids(ii).setFrameCountArea();
+end
+
+%% fix nose positions at 0
+vidi = 1:length(exp.vids);
+for ii = 1:length(vidi)
+    np = exp.vids(ii).nosePos;
+    %corner = find(np(:,1) <= 1 | np(:,1) >= 1280 | np(:, 2) <= 1 | np(:,2) >= 1024);
+    corner = find(np(:,1) >= 1260 | np(:,1) <= 2); 
+    exp.vids(ii).nosePos(corner, :) = NaN;
+    exp.vids(ii).computeVelocity([]);
+    exp.vids(ii).save;
+end
+
 %%
 for ii = 1:length(exp.vids)
     disp(exp.vids(ii).videoFN);
@@ -36,6 +52,16 @@ for ii = 1:length(exp.vids)
     
 end
 
+%%
+for ii = 1:length(exp.vids)
+    exp.vids(ii).fcPeriod = 50;
+    exp.vids(ii).save;
+end
+
+%% Check for missing frames
+for ii = 1:length(exp.vids)
+    exp.vids(ii).isMissingFrame();
+end
 
 %% Plot the velocities of the body and nose
 figure; 
@@ -59,8 +85,9 @@ for ii = 1:length(exp.vids)
     bv = sqrt(sum(exp.vids(ii).bodyVel .^2, 2));
     nv = sqrt(sum(exp.vids(ii).noseVel.^2, 2));
     disp(['Number of frames without nose velocity: ' num2str(sum(isnan(nv)))]);
-    lh = plot(exp.vids(ii).times(:), bv, exp.vids(ii).times(:), nv); 
-    set(lh(2), 'LineWidth', 1);%plot(exp.vids(ii).times(:), bv);
+    %lh = plot(exp.vids(ii).times(:), bv, exp.vids(ii).times(:), nv); 
+    lh = plot(exp.vids(ii).times(:), nv, 'Color', 'g', 'LineWidth', 1); 
+    %set(lh(2), 'LineWidth', 1);%plot(exp.vids(ii).times(:), bv);
     disp(['Total frames: ' num2str(nf)]);
     disp(['Percent without nose: ' num2str(sum(isnan(np(:,1)))./nf*100)]);
     disp(['Percent without nose velocity: ' num2str(sum(isnan(nv)./nf*100))]);
@@ -160,11 +187,11 @@ hold on; plot(vel_x, binned_freq, 'r', 'LineWidth',1);
 
  %% Plotting respiration frequency as a color over the positions
 ft = 1:length(exp.resp);
-ft = 1:3
+%ft = 1:3
 %make a fake sniff hist to get a good, yet constant color scale
 fake_sniff = 13 + 3*randn(1000,1);
 fake_sniff = cat(1, fake_sniff, linspace(0,20,40)');
-[cm, ~, cvals] = getIndexedColors('jet', fake_sniff, 1);
+[cm, ~, cvals] = getIndexedColors('jet', fake_sniff,1);
 cvals(end) = 50;
 %ft = 4;
 %fr = 1:1500;

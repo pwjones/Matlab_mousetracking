@@ -151,45 +151,19 @@
 % for jj=1:nMice
 %     plot(ah3, mean_prop_follow(:,jj),'o-', 'Color', cl{jj}); hold on;
 %     addErrorBars(ah3, 1:nConc, mean_prop_follow(:,jj), std_prop_follow(:,jj)./sqrt(n_prop_follow(:,jj)), cl{jj}, .1);
-% end
+% en
 
 
-%% Plotting of the relationships
-figure;
-% stuff for trend line - a binned mean
-bs = 25;
-vel_bin = mov_thresh:bs:400;
-binned_freq = zeros(length(vel_bin)-1,nMice);
-
-for ii = 1:nMice
-    subplot(2, ceil(nMice/2), ii);
-    hold on;
-
-    % select parts of behavior where mouse is decelerating
-    sel = all_NA{ii} < 0;
-    sel = true(length(all_NA{ii}),1);
-    
-    plot(all_NV_filt{ii}(sel), all_SF{ii}(sel), 'k.', 'MarkerSize', 12);
-     
-    for jj = 1:(length(vel_bin)-1)
-        bi = all_NV_filt{ii}(sel) >= vel_bin(jj) & all_NV_filt{ii}(sel) < vel_bin(jj+1);
-        selSF = all_SF{ii}(sel);
-        binned_freq(jj, ii) = nanmean(selSF(bi));
-    end
-    vel_x = vel_bin(1:end-1) + bs/2;
-    hold on; 
-    plot(vel_x, binned_freq(:,ii), 'r', 'LineWidth',1);
-    
-    xlim([50 300]); ylim([5 18]);
-    xlabel('Vel (mm/sec)'); ylabel('Sniff freq (Hz)');
-    title(mouse_names{ii});
+%% 
+for ii = 1:length(vids)
+    np = vids(ii).nosePos;
+    corner = find(np(:,1) >= 1206 & np(:, 2) >= 954);
+    vids(ii).nosePos(corner, :) = NaN;
+    vids(ii).computeVelocity([]);
+    vids(ii).save;
 end
 
-figure;
-plot(vel_x, binned_freq);
-
-
-
+%%
 
 % %% Plot the time on trail over time - plot by day
 % figure; hold on;
