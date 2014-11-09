@@ -1,5 +1,5 @@
 %redo tracking
-i = 2:7;
+i = 1:length(exp.vids);
 parfor ii = i
    vid = exp.vids(ii);
    vid.fcArea =  [1221 959 1280 999];
@@ -7,3 +7,5 @@ parfor ii = i
    vid.mousePosition([]);
    vid.save;
 end
+
+save('141028_1080.mat', 'exp');

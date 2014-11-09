@@ -6,6 +6,7 @@
 %occr_trials = {73:103, 77:107, 74:111, 75:104, 26:35, 26:36, 26:35, 26:35}; %each cell is a mouse
 %occl_trials = {16:25, 16:25, 16:25, 16:25, 16:25, 16:25, 16:25, 16:25};
 %ctl2_trails = {100:103
+mm_conv = 1.16; %mm per px
 nMice = length(perMouseData);
 nRows = ceil(sqrt(nMice));
 fh = figure; hold on;

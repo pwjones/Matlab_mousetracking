@@ -735,7 +735,8 @@ classdef MouseTracker < handle
             % Some parameters for assignment:
             FTF_OL = .2; % The frame-to-frame overlap to be called the same area
             LOW_OL = .1; % A lower overlap threshold for determining merging
-            MAX_DIST = 14;% The maximum distance to spots can be to autmatically be given same ID.
+            MAX_DIST = ceil(500/1.16/this.frameRate);% The maximum distance to spots can be to autmatically be given same ID.
+            MAX_SIZE_DIFF = .3;
             
             fi = frame;
             if (frame ~= 1)
@@ -763,7 +764,7 @@ classdef MouseTracker < handle
                         % that isn't taken.
                         for jj = 1:length(oli)
                             %test if they are similar enough to be considered same
-                            size_good = (size_diff(jj) < 0.5);
+                            size_good = (size_diff(jj) < MAX_SIZE_DIFF);
                             dist_good = com_dist(jj) < MAX_DIST;
                             overlap_good = ol_vals(jj) > FTF_OL;
                             if ((dist_good + overlap_good) >= 1) && size_good

@@ -4,7 +4,7 @@
 clear perMouseData;
 base_folder = VIDEO_ROOT;
 mouse_names = {'19439', '21413', '971', '1080', '1527'};
-%mouse_names = {'1527'};
+%mouse_names = {'19439'};
 folders = {'140401', '140404', '140409', '141016', '141017', '141020', '141021', '141022', '141024', '141027', '141028', '141029'};
 nMice = length(mouse_names);
 following_thresh = 20; %mm
@@ -59,10 +59,16 @@ for ii = 1:nMice
     % select all of points
     sel = true(length(all_NA{ii}),1);
     vel_pts = all_NV_filt{ii}(sel);
-    sf_pts = all_SF{ii}(sel);
+    sf_pts = all_SF_ISI{ii}(sel);
     disp(sprintf('Mean Velocity: %.2f    Mean Sniff Rate: %.2f', nanmean(vel_pts), nanmean(sf_pts)));
     plot(vel_pts, sf_pts, 'k.', 'MarkerSize', 4);
      
+    % screening for bad points
+    toohi = find(vel_pts > 1000);
+    if ~isempty(toohi)
+        disp(sprintf('Mouse %s: High points %f%% - %f%% through the dataset', mouse_names{ii}, toohi(1)./length(vel_pts), toohi(end)./length(vel_pts)));
+    end
+    % Creating an average for various vels
     for jj = 1:(length(vel_bin)-1)
         bi = vel_pts >= vel_bin(jj) & vel_pts < vel_bin(jj+1);
         binned_freq(jj, ii) = nanmean(sf_pts(bi));
@@ -87,7 +93,7 @@ for ii = 1:nMice
     plot(vel_x, binned_freq(:,ii), 'r', 'LineWidth',2);
     
     
-    %xlim([50 300]); 
+    xlim([50 300]); 
     ylim([5 18]);
     xlabel('Vel (mm/sec)'); ylabel('Sniff freq (Hz)');
     title(mouse_names{ii});

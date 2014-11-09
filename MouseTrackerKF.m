@@ -8,6 +8,8 @@ classdef MouseTrackerKF < MouseTracker
         fullPaths; %the full detected paths, to be saved if the paths are skeletonized
         exploredProp; %the proportions of the trails explored at each timepoint
         trackingStruct; %structure used to save external tracking info
+        trailShadow = [];
+        trailShadow_size = 20;
     end
     
     methods
@@ -416,7 +418,7 @@ classdef MouseTrackerKF < MouseTracker
             set(gca, 'XDir', 'reverse')
         end
         % ---------------------------------------------------------------------------------------------------
-        function exploredProp = plotFollowingTimecourse(this, threshDist)
+        function exploredProp = plotFollowingTimecourse(this, threshDist, varargin)
             % function plotFollowingTimecourse(this)
             %
             % This function returns the proporation of the trail pixels that the mouse came within a given
@@ -430,6 +432,13 @@ classdef MouseTrackerKF < MouseTracker
                 calculated = 1;
             else 
                 calculated = 0;
+            end
+            if nargin > 2
+                ah = varargin{1};
+            else
+                % plotting part
+                figure;
+                ah = axes; hold on;
             end
             if ~calculated
                 exploredProp = zeros(this.nFrames, 2);
@@ -456,8 +465,8 @@ classdef MouseTrackerKF < MouseTracker
             else
                 exploredProp = this.exploredProp;
             end
+            
             % plotting part
-            figure;
             plot(this.times, this.exploredProp(:,1), 'g','LineWidth', 2); hold on;
             plot(this.times, this.exploredProp(:,2), 'r','LineWidth', 2); 
             xlabel('Time (sec)');
@@ -465,13 +474,16 @@ classdef MouseTrackerKF < MouseTracker
             
         end
         % ------------------------------------------------------------------------------------------------------
-        function writeMovie(this, filename, movieType, frames, dispCrop)
+        function writeMovie(this, filename, movieType, frames, dispCrop, speed)
             % function writeMovie(this, filename, movieType, frames, dispCrop)
             % Writes a movie of the tracked mouse to disk at the given location
             if isempty(frames)
                 frames = 1:this.nFrames;
             end
-            vidWriter = VideoWriter(filename);
+            vidWriter = VideoWriter(filename, 'MPEG-4');
+            
+            vidWriter.FrameRate = round(speed*this.frameRate);
+            %vidWrite.Quality = 100;
             open(vidWriter);
             figure;
             for ii=frames
@@ -517,13 +529,14 @@ classdef MouseTrackerKF < MouseTracker
             set(fh, 'WindowKeyPressFcn', '');
         end
         
-         % ------------------------------------------------------------------------------------------------
+        % ------------------------------------------------------------------------------------------------
         function showTrackingLogOverlayMovie(this, movieType, frames, varargin)
+            % This function is for the online tracking that generates a log of the position of each blob.
             if isfield(this.trackingStruct, 'binMovie')
                 sub = this.trackingStruct.movieSubsample;
                 fi = int32(frames).*sub;
                 varargin{end+1} = this.trackingStruct.binMovie(:,:,fi);
-                showMovie(this, movieType, frames, varargin{:})
+                showMovie(this, movieType, frames, varargin{:});
             else
                 disp('You must call readTrackingLog first');
             end
@@ -1290,7 +1303,13 @@ classdef MouseTrackerKF < MouseTracker
                 disp('There is no fullPaths field.');
             end
         end
-        
+        % ------------------------------------------------------------------------------------------------------
+        function makeTrailShadow(this, shadowSize, pathNum)
+            if ~isempty(this.paths)
+                this.makePathsSkel();
+                this.trailShadow = findAllPointsWithinDistance(this.paths(pathNum).PixelList, 20);
+            end
+        end
         % ------------------------------------------------------------------------------------------------------
         function [e, eimage] = detectEdgesInFrame(this, time, absoluteTime, useAvgFrame, imAx)
             % function e = detectEdgesInFrame(this, time, absoluteTime)
@@ -1583,10 +1602,21 @@ classdef MouseTrackerKF < MouseTracker
             end
         end    
         
+        % function findFollowingTurns(this, frames, pathNum, threshDist)
+        % -----------------------------------------------------------------------------------------------------
+        function [turnFrames, dir, dists] = findFollowingTurns(this, frames, pathNum, threshDist, wind)
+            followingFrames = this.getFollowingSegments(frames, pathNum, threshDist);
+            dists = zeros(length(wind), size(followingFrames,1)*10); %big preallocation
+            for ii = 1:size(followingFrames, 1)
+                fr = followingFrames(ii,1):followingFrames(ii,2);
+                dists = this.orthogonalDistFromTrail(fr, pathNum);
+            end 
+        end
+            
         % ------------------------------------------------------------------------------------------------------
         function meanDist = meanOrthogonalDistFromTrail(this, frames, pathNum)
         % function dists = meanOrthogonalDistFromTrail(this, frames, pathNum, threshDist)
-        %
+        %c
         %
             dists = this.orthogonalDistFromTrail(frames, pathNum);
             meanDist = nanmean(dists);
@@ -1751,7 +1781,26 @@ classdef MouseTrackerKF < MouseTracker
             nose_jumps = [nose_jumps; ni];
             nose_jumps = sort(unique(nose_jumps));
         end
+        
+        % ------------------------------------------------------------------------------------------------
+        function showFrameAroundMouse(this, framei, movieType, varargin)
+            wind_size = 150;
+            np = this.nosePos(framei, :);
             
+            if ~isnan(np(1))
+                c = np;
+            else
+                cents = [];
+                for ii = 1:nblobs(framei)
+                    cents = cat(1, cents, this.areas(framei, ii).Centroid);
+                end
+                c = mean(cents);
+            end
+            dispCrop = [c(1) - wind_size/2,                  c(2) - wind_size/2, ...
+                        this.width-( c(1)+wind_size/2 ),     this.height-( c(2)+wind_size/2 ) ];
+            this.showFrame(framei, movieType, dispCrop, varargin{:});
+        end
+        
         % ------------------------------------------------------------------------------------------------------
         function showFrame(this, framei, movieType, dispCrop, varargin)
             % function showFrame(this, framei, useBinMovie)
@@ -1803,7 +1852,7 @@ classdef MouseTrackerKF < MouseTracker
                     plot(this.COM(framei,1,jj), this.COM(framei,2,jj), 'r+', 'MarkerSize', 12, 'LineWidth',1);
                     ellipse(this.areas(framei,jj).MajorAxisLength/2, this.areas(framei,jj).MinorAxisLength/2, ...
                             this.orient(framei,jj), this.COM(framei,1,jj),this.COM(framei,2,jj),'r');
-                    text(this.COM(framei,1,jj)+10, this.COM(framei,2,jj), num2str(this.blobID(framei, jj)), 'Color','r', 'FontSize', 14);
+                    %text(this.COM(framei,1,jj)+10, this.COM(framei,2,jj), num2str(this.blobID(framei, jj)), 'Color','r', 'FontSize', 14);
                 end
                 line(this.bodyCOM(framei,1), this.bodyCOM(framei,2), 'Marker', 'o', 'Color', 'c','MarkerSize', 12, 'LineWidth',2);
                     %line(this.areas(framei).Extrema(:,1), this.areas(framei).Extrema(:,2), 'Marker', '.', 'Color', 'c');
