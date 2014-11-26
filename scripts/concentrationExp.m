@@ -246,7 +246,7 @@ for jj = 1:length(perMouseData)
 end
 
 %% Mouse velocities as they are following the trail
-mm_conv = 1.16; %mm/px linear
+mm_conv = .862; %mm/px linear
 figure; nva = axes; hold on;
 max_l = 0;
 colors = blackGradColormap([0 1 0], nConc+1); colors = colors(2:end,:);

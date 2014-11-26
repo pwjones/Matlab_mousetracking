@@ -36,8 +36,9 @@ for ii = 1:2
 end
     
 counts = cell(2,1); %want to do a reward/distractor, early/late comparison
+nbins = 80;
 dx = .5;
-xbins = -dist_thresh:dx:dist_thresh;
+xbins = linspace(-dist_thresh, dist_thresh, nbins);
 %xcenters = (dx*(0:(length(xbins)-1))) - dist_thresh + (dx/2);
 for ii=1:2
     counts{ii} = hist(distance_comp{ii}, xbins);
@@ -82,4 +83,4 @@ end
 set(get(cdf_ah,'XLabel'), 'String', 'Nose distance From Trail (px)', 'FontSize', 18);
 set(get(cdf_ah,'Ylabel'), 'String', 'Cumulative Proporation of Frames', 'FontSize', 18);
 set(cdf_ah, 'Tickdir', 'out', 'FontSize', 14);
-axes(cdf_ah); ylim([0 1]);
+axes(cdf_ah); ylim([0 1]); xlim(xl);

@@ -8,7 +8,7 @@ global VIDEO_ROOT;
 base_fname = VIDEO_ROOT;
 class_func = @MouseTrackerKF;
 %class_func = @MouseTrackerUnder2;
-mm_conv = 1.16; %mm/px linear
+mm_conv = .862; %mm/px linear
 %%%%%%%%%%%%%%%% Start in on doing things  %%%%%%%%%%%%%%%%
 if ~iscell(files)
     fid = fopen(files, 'r');
@@ -85,8 +85,8 @@ for ii = 1:nfiles
     % now collect a few factors about each of the movies
     total_frames(ii) = mt.nFrames;
     frame_rate(ii) = mt.frameRate;
-    rew_trail_area(ii) = mt.paths(1).Area * mm_conv^2;
-    dist_trail_area(ii) = mt.paths(2).Area * mm_conv^2;
+    rew_trail_area(ii) = mt.paths(1).Area * mm_conv; %though the variable says area, it's a length with skeleton paths
+    dist_trail_area(ii) = mt.paths(2).Area * mm_conv;
     rew_propFollowed(ii) = mt.propTrailFollowed([], 1, 10);
     dist_propFollowed(ii) = mt.propTrailFollowed([],2,10);
     file_names{ii} = mt.videoFN;
@@ -95,8 +95,10 @@ for ii = 1:nfiles
         nv{jj} = mt.noseVel(ff(jj,1):ff(jj,2));
         bv{jj} = mt.bodyVel(ff(jj,1):ff(jj,2));
     end
-    nose_vel{ii} = nv;
-    body_vel{ii} = bv;
+    if ~isempty(ff)
+        nose_vel{ii} = nv;
+        body_vel{ii} = bv;
+    end
 end
 
 % Results

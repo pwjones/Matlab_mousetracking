@@ -1,7 +1,7 @@
 function linearizeTrail(tracker)
 
 dist_thresh = 50;
-mm_conv = 1.16; %mm/px linear
+mm_conv = .862; %mm/px linear
 
 
 ff = tracker.getFollowingSegments([],1, dist_thresh);

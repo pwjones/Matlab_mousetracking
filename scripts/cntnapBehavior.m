@@ -193,7 +193,7 @@ legend({'Rewarded Trail', 'Distracter Trail'});
 xlabel('Trial #', 'FontSize', 14); ylabel('Median Following Distance (px)', 'FontSize', 14);
 
 %% Mouse velocities as they are following the trail
-mm_conv = 1.16; %mm/px linear
+mm_conv = .862; %mm/px linear
 figure; nva = axes; hold on;
 %figure; bva = axes; hold on;
 colors = {[0 0 0], [1 0 0], [0 0 1], [0 1 0]};

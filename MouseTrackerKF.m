@@ -4,7 +4,7 @@ classdef MouseTrackerKF < MouseTracker
         used_thresh = 0;
         p_mouse = .001; %the proportion of pixels that are 
         kf = struct('nstates', {}, 'nob', {}, 's', {});
-        mm_conv = 1.16; %mm/px linear
+        mm_conv = .862; %mm/px linear
         fullPaths; %the full detected paths, to be saved if the paths are skeletonized
         exploredProp; %the proportions of the trails explored at each timepoint
         trackingStruct; %structure used to save external tracking info
@@ -115,7 +115,7 @@ classdef MouseTrackerKF < MouseTracker
         % 1) 'nose' or 'body' for different velocities.  Nose is default.
         % 2) Gaussian filter length in samples - the velocity can be noisy, which can interfere with
         %    its visualization.  Filtering to reduce extremes.  Default is 1, the std in samples.
-            mm_conv = 1.16; %mm/px linear
+            mm_conv = .862; %mm/px linear
             
             %input parsing/checking
             if ~exist('frames', 'var') || isempty(frames); frames = 1:this.nFrames; end
@@ -138,7 +138,7 @@ classdef MouseTrackerKF < MouseTracker
             end
             vel_vect = gaussianFilter(vel_vect, filt_std, 'conv');
             vel_vect = mm_conv * this.frameRate * vel_vect;  %convert to mm/sec
-            [cm cinds] = getIndexedColors('jet', vel_vect, 0, [0 400]);
+            [cm cinds] = getIndexedColors('jet', vel_vect, 0, [0 300]);
             
             % unfortunately, I haven't been able to figure out an easier way to do colormapping of points plotted over
             % a B&W image, without the points and the image sharing the same colormap.  So, here I'm just plotting every
@@ -160,7 +160,8 @@ classdef MouseTrackerKF < MouseTracker
             %ah2 = axes('position', [.1 .1 .7 .8], 'visible', 'off');
             colormap(cm);
             %axes(ah2);
-            pcolor([vel_vect(frames,1), vel_vect(frames,1)]);
+            %pcolor([vel_vect(frames,1), vel_vect(frames,1)]);
+            pcolor([0:300; 0:300]);
             %line('parent', ah2, 'ydata', sorted_dir, 'xdata', 1:length(sorted_dir)); 
             colorbar;
         end
@@ -259,9 +260,9 @@ classdef MouseTrackerKF < MouseTracker
                     %    this.areas(fi,this.noseblob(fi)).Centroid(2), 'Marker', '.', 'MarkerSize', 8, 'Color', plotblue);
                     line('Parent', ah, 'Xdata', this.nosePos(fi,1), 'Ydata', ...
                         this.nosePos(fi,2), 'Marker', '.', 'MarkerSize', 10, 'Color', plotblue);
-                    if(mod(ii, 50) == 0)
-                        text(np(1)+5, np(2)+5, num2str(fi));
-                    end
+%                     if(mod(ii, 50) == 0)
+%                         text(np(1)+5, np(2)+5, num2str(fi));
+%                     end
                     %line('Parent', ah, 'Xdata', this.nosePos(fi,1), 'Ydata', ...
                     %    this.nosePos(fi,2), 'Marker', '.', 'MarkerSize', 10, 'Color', 'w');
                 end
@@ -368,7 +369,7 @@ classdef MouseTrackerKF < MouseTracker
                 frames = 1:this.nFrames;
             end
             [dists, fframes] = this.distanceOnTrail(frames,1,dist_thresh);
-            this.plotNosePosition; hold on;
+            this.plotNosePosition(frames); hold on;
             for i=1:size(fframes,1)
                 range = fframes(i,1):fframes(i,2);
                 np = this.nosePos(range, :);
@@ -1605,12 +1606,46 @@ classdef MouseTrackerKF < MouseTracker
         % function findFollowingTurns(this, frames, pathNum, threshDist)
         % -----------------------------------------------------------------------------------------------------
         function [turnFrames, dir, dists] = findFollowingTurns(this, frames, pathNum, threshDist, wind)
+            pb = 1;
+            vel_conv = this.mm_conv * this.frameRate;
+            if pb
+                figure; hold on;
+            end
+            thresh_vel = 40;
+            filt_vel = gaussianFilter(this.noseVel, 2, 'conv') .* vel_conv;
             followingFrames = this.getFollowingSegments(frames, pathNum, threshDist);
-            dists = zeros(length(wind), size(followingFrames,1)*10); %big preallocation
+            turnFrames = []; dir = []; dists = [];
             for ii = 1:size(followingFrames, 1)
                 fr = followingFrames(ii,1):followingFrames(ii,2);
+                vel_pass = filt_vel(fr) > thresh_vel;
                 dists = this.orthogonalDistFromTrail(fr, pathNum);
+                smooth_dists = gaussianFilter(dists, 1.5,'conv', 'valid'); %do the smoothing of position beforehand
+                [~, turnInds,dirs] = findMinAndMaxPeaks(smooth_dists, -20, 2, 0, 0); %signal, threshold, window width, filter width
+                vp_turns = vel_pass(turnInds);
+                turnFrames = cat(1, turnFrames, turnInds(vp_turns) + fr(1) - 1);
+                dir = cat(1, dir, dirs(vp_turns));
+                %turns = turns & vel_pass; % just keep those turns that happen above a certain velocity
+                %turnFrames = cat(1, turnFrames, find(turns) + fr(1) - 1);
+                
+                
+                if pb
+                    plot(dists); 
+                    plot(turnInds, dists(turnInds), 'ro');
+                    hold on; plot(smooth_dists, 'g'); 
+                end
             end 
+            
+            dists = NaN*zeros(length(wind), length(turnFrames)); %big preallocation
+            for ii = 1:length(turnFrames)
+                windi = wind + turnFrames(ii);
+                inRange = find(windi >= 1 & windi <= this.nFrames);
+                windi = windi(inRange);
+                
+                %centi = find(windi == turnFrames(ii), 1, 'first');
+                %save_centi = find(wind == 0, 1, 'first');
+                temp_dists = this.orthogonalDistFromTrail(windi, 1);
+                dists(inRange, ii)=temp_dists;
+            end
         end
             
         % ------------------------------------------------------------------------------------------------------

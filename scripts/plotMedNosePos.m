@@ -5,7 +5,7 @@
 
 % perMouseData is present and has multiple mice
 following_thresh = 20;
-mm_conv = 1.16; %mm/px conversion
+mm_conv = .862; %mm/px conversion
 % mouse_names = {'16220', '16221', '16227', '16231', '3090', '3091'};
 % %mouse_names = {'16220', '16221', '16227', '16231'};
 % train_trials = {1:72, 1:76, 1:73, 1:74, 1:35, 1:70};
@@ -21,6 +21,7 @@ med_nose_pos_ctl = NaN*zeros(nMice, 1);
 med_nose_pos_ctl2 = NaN*zeros(nMice, 1);
 med_nose_pos_occr = NaN*zeros(nMice, 1);
 med_nose_pos_occl = NaN*zeros(nMice, 1);
+shift_mag = [];
 for ii = 1:nMice
     all_dists = perMouseData(ii).rew_dists_from_trail_persect(ctl_trials{ii});
     following_dists = [];
@@ -68,17 +69,27 @@ for ii = 1:nMice
     med_nose_pos_occl(ii) = median(following_dists);
     
     % Let's do some statistical tests on the resulting distributions
-    hl = 0; hr = 0;
-    if ~isempty(nose_pos_ctl{ii}) && ~isempty(nose_pos_occr{ii})
-        [p,hr] = ranksum(nose_pos_ctl{ii}, nose_pos_occr{ii});
+    hl = 0; hr = 0; 
+    all_pos_ctl = cat(1, nose_pos_ctl{ii}, nose_pos_ctl2{ii});
+    if ~isempty(all_pos_ctl) && ~isempty(nose_pos_occr{ii})
+        shift_mag = cat(1, shift_mag, abs(nanmedian(all_pos_ctl) - nanmedian(nose_pos_occr{ii})));
+        med_str = sprintf('Mouse %s Median nose positions ctl=%f Right occlusion=%f', ...
+                            mouse_names{ii}, nanmedian(all_pos_ctl), nanmedian(nose_pos_occr{ii}));
+        disp(med_str);
+        %test
+        [p,hr] = ranksum(all_pos_ctl, nose_pos_occr{ii});
         if hr sig = ''; else sig = 'NOT'; end
         sig_str = sprintf('Mouse %s Wilcoxon: Unoccluded-Right Occlusion is %s significantly different: h=%i p=%f', ...
                            mouse_names{ii}, sig, hr, p);
         disp(sig_str);
     end
     
-    if ~isempty(nose_pos_ctl{ii}) && ~isempty(nose_pos_occl{ii})
-        [p,hl] = ranksum(nose_pos_ctl{ii}, nose_pos_occl{ii});
+    if ~isempty(all_pos_ctl) && ~isempty(nose_pos_occl{ii})
+        shift_mag = cat(1, shift_mag, abs(nanmedian(all_pos_ctl) - nanmedian(nose_pos_occl{ii})));
+        med_str = sprintf('Mouse %s Median nose positions ctl=%f Left occlusion=%f', ...
+                            mouse_names{ii}, nanmedian(all_pos_ctl), nanmedian(nose_pos_occl{ii}));
+        disp(med_str);
+        [p,hl] = ranksum(all_pos_ctl, nose_pos_occl{ii});
         if hl sig = ''; else sig = 'NOT'; end
         sig_str = sprintf('Mouse %s Wilcoxon: Unoccluded-Left Occlusion is %s significantly different: h=%i p=%f', ...
                            mouse_names{ii}, sig, hl, p);
@@ -86,19 +97,19 @@ for ii = 1:nMice
     end
     
     % now let's plot the medians with fill indicating significance
-    y = [med_nose_pos_occl(ii), med_nose_pos_ctl(ii), med_nose_pos_occr(ii)]; 
-    x = 1:3;
+    y = [med_nose_pos_occl(ii), med_nose_pos_ctl(ii), med_nose_pos_ctl2(ii), med_nose_pos_occr(ii)]; 
+    x = [1, 2.25, 2.75, 4];
     plot(x, y, 'o-k', 'MarkerSize', 10);
     % Replot the filled markers over if they are significant
     if hl
         plot(1,y(1), 'ok', 'MarkerSize', 10, 'MarkerFaceColor', 'k');
     end
     if hr
-        plot(3,y(3), 'ok', 'MarkerSize', 10, 'MarkerFaceColor', 'k');
+        plot(4,y(4), 'ok', 'MarkerSize', 10, 'MarkerFaceColor', 'k');
     end
 end
 
 % Make some asthetic changes to the plot
-set(gca, 'FontSize', 12, 'xtick', 1:3, 'xticklabel', {'Left Occluded', 'Unoccluded', 'Right Occluded'}, 'TickDir', 'out');
+set(gca, 'FontSize', 12, 'xtick', [1, 2.5 4], 'xticklabel', {'Left Occluded', 'Unoccluded', 'Right Occluded'}, 'TickDir', 'out');
 ylabel('Median Distance from Trail (mm)', 'FontSize', 14);
 

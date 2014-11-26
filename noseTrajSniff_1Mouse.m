@@ -20,7 +20,7 @@ else
 end
 
 
-% mm_conv = 1.16; %mm/px linear
+% mm_conv = .862; %mm/px linear
 % thresh_dist = 25;
 % traj_wind = -30:60; 
 % exp_sniffDists = []; exp_followDists = [];

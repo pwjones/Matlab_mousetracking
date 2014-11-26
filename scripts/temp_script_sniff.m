@@ -92,9 +92,21 @@ for ii = 1:length(exp.vids)
     exp.vids(ii).isMissingFrame();
 end
 
+%% change the conversions
+for ii = 1:length(exp.vids)
+   exp.vids(ii).mm_conv = .862;
+   exp.vids(ii).save;
+    
+end
+
+%% change the conversions
+for ii = 1:length(exp.vids)
+   exp.vids(ii).findFollowingTurns([], 1, 20, -20:20);
+end
+
 %% Plot the velocities of the body and nose
 
-vel_con = 1.16 * exp.vids(1).frameRate; %mm/px linear
+vel_con = .862 * exp.vids(1).frameRate; %mm/px linear
 vel_fig = figure;
 pos_fig = figure; 
 for ii = 1:length(exp.vids)
@@ -168,7 +180,7 @@ end
     
 %% Plot the velocity and the sniff rate with each other.
 ft = 1
-mm_conv = 1.16;
+mm_conv = .862;
 for ii = ft
     v_scale = mm_conv*exp.vids(ii).frameRate;
     figure;
@@ -209,7 +221,7 @@ end
  
  %% Plot position/velocity for videos
  fh = figure;
- mm_conv = 1.16;
+ mm_conv = .862;
  for ii =1:length(exp.vids)
      exp.vids(ii).plotVelocity([],'nose', 2);
      
