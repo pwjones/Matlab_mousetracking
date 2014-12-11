@@ -7,6 +7,7 @@ classdef MouseTrackerKF < MouseTracker
         mm_conv = .862; %mm/px linear
         fullPaths; %the full detected paths, to be saved if the paths are skeletonized
         exploredProp; %the proportions of the trails explored at each timepoint
+        exploredLen; %the lengths of the trails explored at each timepoint (in px)
         trackingStruct; %structure used to save external tracking info
         trailShadow = [];
         trailShadow_size = 20;
@@ -419,7 +420,7 @@ classdef MouseTrackerKF < MouseTracker
             set(gca, 'XDir', 'reverse')
         end
         % ---------------------------------------------------------------------------------------------------
-        function exploredProp = plotFollowingTimecourse(this, threshDist, varargin)
+        function [exploredProp, exploredLen] = plotFollowingTimecourse(this, threshDist, varargin)
             % function plotFollowingTimecourse(this)
             %
             % This function returns the proporation of the trail pixels that the mouse came within a given
@@ -429,6 +430,9 @@ classdef MouseTrackerKF < MouseTracker
             % Algorthmically, this is a similar problem to finding the following segments except reversed.  As
             % implemented it's SLOW.  Thought for speeding it up is to do it on the full video once, to get the
             % frames where the animal is within distance of ANY pixel, then do the incremental on only those frames.
+            %
+            % exploredLen returns a length in mm using mm_conv
+            pb=1;
             if (sum(sum(this.exploredProp)) > 0)
                 calculated = 1;
             else 
@@ -436,13 +440,18 @@ classdef MouseTrackerKF < MouseTracker
             end
             if nargin > 2
                 ah = varargin{1};
+                if isempty(ah)
+                    pb = 0;
+                end
             else
                 % plotting part
                 figure;
                 ah = axes; hold on;
             end
             if ~calculated
-                exploredProp = zeros(this.nFrames, 2);
+                nPaths = length(this.paths);
+                exploredProp = zeros(this.nFrames, nPaths);
+                exploredLen = zeros(this.nFrames, nPaths);
                 this.makePathsSkel();
                 for ii = 1:this.nFrames
                     if ~mod(ii, 100)
@@ -451,7 +460,7 @@ classdef MouseTrackerKF < MouseTracker
                     np = this.nosePos(1:ii,:);
                     nn = ~isnan(np(:,1));
                     np = np(nn,:);
-                    for trailNum = 1:2
+                    for trailNum = 1:nPaths
                         trailPos = this.paths(trailNum).PixelList;
                         
                         distm = ipdm(single(np), single(trailPos));
@@ -459,19 +468,24 @@ classdef MouseTrackerKF < MouseTracker
                         explored = find(trailDist <= threshDist);
                         npx = length(this.paths(trailNum).PixelIdxList);
                         exploredProp(ii,trailNum) = length(explored)/npx;
+                        exploredLen(ii,trailNum) = length(explored);
                     end
                 end
                 this.makePathsFull();
                 this.exploredProp = exploredProp;
+                this.exploredLen = exploredLen * this.mm_conv;
             else
                 exploredProp = this.exploredProp;
+                exploredLen = this.exploredLen;
             end
             
             % plotting part
-            plot(this.times, this.exploredProp(:,1), 'g','LineWidth', 2); hold on;
-            plot(this.times, this.exploredProp(:,2), 'r','LineWidth', 2); 
-            xlabel('Time (sec)');
-            ylabel('Proportion of the trail explored');
+            if pb
+                plot(this.times, this.exploredLen(:,1), 'g','LineWidth', 2); hold on;
+                plot(this.times, this.exploredLen(:,2), 'r','LineWidth', 2); 
+                xlabel('Time (sec)');
+                ylabel('Length of the trail explored');
+            end
             
         end
         % ------------------------------------------------------------------------------------------------------
@@ -1606,7 +1620,7 @@ classdef MouseTrackerKF < MouseTracker
         % function findFollowingTurns(this, frames, pathNum, threshDist)
         % -----------------------------------------------------------------------------------------------------
         function [turnFrames, dir, dists] = findFollowingTurns(this, frames, pathNum, threshDist, wind)
-            pb = 1;
+            pb = 0;
             vel_conv = this.mm_conv * this.frameRate;
             if pb
                 figure; hold on;

@@ -82,14 +82,20 @@ classdef MouseTracker < handle
                 elseif exist(filename, 'file') % a valid filename is specified
                     this.videoFN = filename;
                 end
+                loadVideo = 1;
+            else
+                loadVideo = 0;
             end
-            if (isempty(filename) || ~exist(filename)) % && ~mclIsNoDisplaySet() %a non-complete path was specified, and needs to be chosen
+            if (isempty(filename) || ~exist(filename)) && loadVideo % && ~mclIsNoDisplaySet() %a non-complete path was specified, and needs to be chosen
                 movie_folder = '/Volumes/Alexandria/pwj_data/mouse_training/';
                 [filename, movie_folder] = uigetfile([movie_folder '*.*']);
                 if filename == 0 % the user has canceled the file selection
                     return;
                 end
                 this.videoFN = [movie_folder filename];
+            elseif ~loadVideo
+                %movie_folder = '/Volumes/Alexandria/pwj_data/mouse_training/';
+                this.videoFN = '';
             else
                 this.videoFN = filename;
             end
@@ -100,9 +106,15 @@ classdef MouseTracker < handle
                 disp(['Loading the saved object for: ' mat_fn]);
                 arg_vidFN = this.videoFN;
                 try
-                    load(mat_fn)
+                    saved = load(mat_fn)
                 catch ME
                     disp(['Error loading: ' mat_fn]);
+                end
+                if ~strcmp(class(saved.this), class(this))
+                    saved = eval([class(this) '(saved.this);']);
+                    this = saved;
+                else
+                    this = saved.this;
                 end
                 if exist(this.videoFN, 'file')
                     this.findMovieFile(this.videoFN);
@@ -112,7 +124,7 @@ classdef MouseTracker < handle
                     error('There is no valid movie file specified. Cannot load object');
                 end
                 this.videoFN = arg_vidFN; %for some reason, in no case does the full video filename gets saved
-            else %initialize normally 
+            elseif loadVideo %initialize normally 
                 % Read just a couple of frames to get an idea of video speeds, etc.
                 this.readerObj = VideoReader(this.videoFN);
                 
@@ -170,13 +182,13 @@ classdef MouseTracker < handle
                 %this.times = ((this.frameRange(1):this.frameRange(2))-1)/this.frameRate + t_offset;
                 %initialize areas
                 this.clearCalcData();
+            else
+                this.nFrames = 0;
+                this.clearCalcData();
             end
         end %function MouseTracker
         
-        % ----------- Conversion function to make a MouseTrackerKF object ---------------------------
-        function mt = MouseTrackerKF(varargin)
-            mt = MouseTrackerKF(varargin);
-        end
+       
             
         % ------------------------------------------------------------------------------------------------------
         function [wantedCOM, nose] = mousePosition(this, time_range)

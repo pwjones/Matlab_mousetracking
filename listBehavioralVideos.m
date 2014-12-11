@@ -1,4 +1,4 @@
-function [videoFN, folder_nums] = listBehavioralVideos(base_folder, folders, mouse_names) 
+function [videoFN, folder_nums, day_nums] = listBehavioralVideos(base_folder, folders, mouse_names) 
 % function listBehavioralVideos(base_folder, folders, mouse_names) 
 %
 % Some code to read text files in each video folder and put together the list of videos for each mouse. 
@@ -9,7 +9,7 @@ function [videoFN, folder_nums] = listBehavioralVideos(base_folder, folders, mou
 
 %folder_nums = [];
 for ii = 1:length(mouse_names)
-    fni = 1; fn = {}; folderlist = [];
+    fni = 1; fn = {}; folderlist = []; dayi = 0; daylist = [];
     for jj = 1:length(folders)
         vid_list_file = [base_folder filesep folders{jj} filesep 'tracking_times.txt'];
         if exist(vid_list_file, 'file')
@@ -27,11 +27,19 @@ for ii = 1:length(mouse_names)
         for kk = 1:length(mouse_inds)
             fn{fni} = [folders{jj} filesep filenames{mouse_inds(kk)}];
             folderlist(fni) = jj;
+            if(kk==1)
+                dayi = dayi+1;
+            end
+            daylist(fni) = dayi;
             fni = fni+1;
             %folderlist = folders{jj};
+        end
+        if ~isempty(fid)
+            fclose(fid);
         end
     end
     videoFN{ii} = fn;
     folder_nums{ii} = folderlist;
+    day_nums{ii} = daylist;
 end
             

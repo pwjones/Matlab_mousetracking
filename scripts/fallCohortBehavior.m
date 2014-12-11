@@ -8,7 +8,7 @@ following_thresh = 15; %px
 mm_conv = .862; %mm/px
 clear perMouseData;
 
-[videoList, folder_nums] = listBehavioralVideos(base_folder, folders, mouse_names);
+[videoList, folder_nums, day_nums] = listBehavioralVideos(base_folder, folders, mouse_names);
 
 s = matlabpool('size');
 if s~=0

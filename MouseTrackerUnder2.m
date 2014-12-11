@@ -160,9 +160,96 @@ classdef MouseTrackerUnder2 < handle
             end
         end %function MouseTracker
         
+         % ----------- Conversion function to make a MouseTrackerKF object ---------------------------
+        function mt = MouseTrackerKF(this)
+            % This is a tedious function to write, but it's just making a MouseTrackerKF object and
+            % populating it with the variables in this object.
+            mt = MouseTrackerKF();
+            mt.MOUSE_SCALE = this.MOUSE_SCALE;
+            mt.MIN_SIZE_THRESH = this.MIN_SIZE_THRESH; 
+            mt.MAX_SIZE_THRESH = this.MAX_SIZE_THRESH;
+            mt.videoFN = this.videoFN ;
+            mt.readerObj = this.readerObj;
+            mt.framesPerSeg = this.framesPerSeg;
+            mt.avgSubsample=this.avgSubsample;
+            mt.width = this.width; 
+            mt.nativeWidth = this.nativeWidth;
+            mt.height = this.height;
+            mt.nativeHeight = this.nativeHeight;
+            mt.crop = this.crop; 
+            mt.frameRate = this.frameRate;
+            mt.totalDuration = this.totalDuration; 
+            mt.nFrames = this.nFrames;
+            mt.trustFrameCount = this.trustFrameCount;
+            mt.frameRange = this.frameRange;
+            mt.avgFrame = this.avgFrame;
+            mt.maxBlobs = this.maxBlobs; 
+            mt.nblobs = this.nblobs; 
+            mt.tailblob = this.tailblob;
+            mt.noseblob  = this.noseblob;
+            mt.COM = this.COM;
+            mt.bodyCOM = this.bodyCOM;
+            mt.bodyOrient = this.bodyOrient;
+            mt.orient = this.orient;
+            mt.vel = this.vel;
+            mt.bodyVel = this.bodyVel;
+            mt.noseVel = this.noseVel;
+            mt.direction = this.direction;
+            mt.nosePos = this.nosePos;
+            mt.times = this.times;
+            mt.areas = this.areas;
+            mt.tailVisible = this.tailVisible;
+            mt.paths = this.paths;
+            mt.boostContrast = this.boostContrast; 
+            mt.regprops = this.regprops;
+            mt.blobsToDelete = this.blobsToDelete;
+            mt.computeVelocity([]);
+        end
+            
         % ----------- Conversion function to make a MouseTrackerKF object ---------------------------
-        function mt = MouseTrackerKF(varargin)
-            mt = MouseTrackerKF(varargin);
+        function mt = MouseTracker(this)
+            % This is a tedious function to write, but it's just making a MouseTrackerKF object and
+            % populating it with the variables in this object.
+            mt = MouseTracker();
+            mt.MOUSE_SCALE = this.MOUSE_SCALE;
+            mt.MIN_SIZE_THRESH = this.MIN_SIZE_THRESH; 
+            mt.MAX_SIZE_THRESH = this.MAX_SIZE_THRESH;
+            mt.videoFN = this.videoFN ;
+            mt.readerObj = this.readerObj;
+            mt.framesPerSeg = this.framesPerSeg;
+            mt.avgSubsample=this.avgSubsample;
+            mt.width = this.width; 
+            mt.nativeWidth = this.nativeWidth;
+            mt.height = this.height;
+            mt.nativeHeight = this.nativeHeight;
+            mt.crop = this.crop; 
+            mt.frameRate = this.frameRate;
+            mt.totalDuration = this.totalDuration; 
+            mt.nFrames = this.nFrames;
+            mt.trustFrameCount = this.trustFrameCount;
+            mt.frameRange = this.frameRange;
+            mt.avgFrame = this.avgFrame;
+            mt.maxBlobs = this.maxBlobs; 
+            mt.nblobs = this.nblobs; 
+            mt.tailblob = this.tailblob;
+            mt.noseblob  = this.noseblob;
+            mt.COM = this.COM;
+            mt.bodyCOM = this.bodyCOM;
+            mt.bodyOrient = this.bodyOrient;
+            mt.orient = this.orient;
+            mt.vel = this.vel;
+            mt.bodyVel = this.bodyVel;
+            mt.noseVel = this.noseVel;
+            mt.direction = this.direction;
+            mt.nosePos = this.nosePos;
+            mt.times = this.times;
+            mt.areas = this.areas;
+            mt.tailVisible = this.tailVisible;
+            mt.paths = this.paths;
+            mt.boostContrast = this.boostContrast; 
+            mt.regprops = this.regprops;
+            mt.blobsToDelete = this.blobsToDelete;
+            mt.computeVelocity([]);
         end
             
         % ------------------------------------------------------------------------------------------------------
