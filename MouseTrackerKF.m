@@ -1498,9 +1498,30 @@ classdef MouseTrackerKF < MouseTracker
                 nosePos = this.nosePos(frames,:);
                 trailPos = this.paths(pathNum).PixelList;
                 distm = ipdm(single(nosePos), single(trailPos));
-                [noseDist, mini] = nanmin(distm, [], 2);
-                closestTrailP = trailPos(mini, :);
-                vects = closestTrailP - nosePos;
+                %distm = ipdm(nosePos, trailPos, 'Subset', 'SmallestFew', 'limit', 10);
+                % Must figure out if the animals' nose is over the trail or not. Do this by getting the 4
+                % closest trail points to each nose position and see if they encircle it.
+                noseDist = NaN*zeros(size(nosePos,1),4); 
+                closestTrailP = ones(size(nosePos,1),2,4);
+                for ii = 1:4
+                    [noseDist(:,ii), mini] = nanmin(distm, [], 2); %get the minimum value
+                    li = sub2ind(size(distm), (1:size(nosePos,1))', mini);
+                    distm(li) = NaN; %set the mins to NaN to get the next closest
+                    closestTrailP(:,:,ii) = trailPos(mini, :);
+                end
+                %nosePos3 = repmat(nosePos, [1, 1, 4]);
+                %posDiff = nosePos3-closestTrailP;
+                pass = noseDist <= sqrt(2);
+                over = (sum(pass,2) == 4) & (sum(noseDist,2) <= 2+sqrt(2));
+                %dd = abs(posDiff) <= 1;
+                %over = sum(sum(dd,3),2) == 8;
+                %over = abs(posDiff) < .01;
+                %over = (noseDist+noseDist2) <= sqrt(2); % frames where the nose is between two trail points
+                noseDist = noseDist(:,1);
+                noseDist(over) = 0; %set those points to zero because the nose IS over the trail itself
+                
+                
+                vects = closestTrailP(:,:,1) - nosePos;
             else % if there are no paths return zeros, but if there are return a mock path result
                 if isempty(this.paths)
                     noseDist = NaN*zeros(length(frames), 1);
@@ -1520,7 +1541,7 @@ classdef MouseTrackerKF < MouseTracker
             if ~isempty(varargin)
                 thresh_dist = varargin{1}; %varargin 1 is the threshold distance to only return those distances under that
                 %noseDist = noseDist * this.mm_conv;
-                seli = noseDist < thresh_dist;
+                seli = abs(noseDist) < thresh_dist;
                 noseDist = noseDist(seli) ;
                 ret_frames = frames(seli);
                 vects = vects(seli,:);

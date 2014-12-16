@@ -44,11 +44,6 @@ for ii=1:nMice
 end
 
 fh = figure;
-title('Trail Areas');
-xlim([1 Inf]);
-xlabel('# Days');
-ylabel('Avg Trail Following Efficiency (mm/sec)');
-ylim([0 60]);
 
 mean_individual_mice = squeeze(nanmean(all_rates, 2));
 colors = {'g','r'};
@@ -61,3 +56,9 @@ mean_pooled = squeeze(nanmean(pooled,1));
 for ii = 1:2
     plot(squeeze(mean_pooled(:,ii)),'Color', colors{ii},'LineWidth', 2); hold on;
 end
+
+title('Trail Areas');
+xlim([1 Inf]);
+xlabel('# Days');
+ylabel('Avg Trail Following Efficiency (mm/sec)');
+ylim([0 60]);

@@ -4,8 +4,9 @@
 fallCohortList; % this script contains the mouse and file names to be included in the analysis.
 %spring14CohortList;
 base_folder = VIDEO_ROOT;
-following_thresh = 15; %px
+following_thresh = 20; %px
 mm_conv = .862; %mm/px
+skeletonize_paths = 0;
 clear perMouseData;
 
 [videoList, folder_nums, day_nums] = listBehavioralVideos(base_folder, folders, mouse_names);
@@ -13,11 +14,11 @@ clear perMouseData;
 s = matlabpool('size');
 if s~=0
     parfor ii = 1:length(videoList)
-        perMouseData(ii) = loadMouseTracking(videoList{ii}, 1:length(videoList{ii}), following_thresh);
+        perMouseData(ii) = loadMouseTracking(videoList{ii}, 1:length(videoList{ii}), following_thresh, skeletonize_paths);
     end
 else
     for ii = 1:length(videoList)
-        perMouseData(ii) = loadMouseTracking(videoList{ii}, 1:length(videoList{ii}), following_thresh);
+        perMouseData(ii) = loadMouseTracking(videoList{ii}, 1:length(videoList{ii}), following_thresh, skeletonize_paths);
     end
 end
 
@@ -326,20 +327,21 @@ end
 %occr_trials = {73:103, 77:107, 74:111, 75:104, 26:35, 26:36, 26:35, 26:35}; %each cell is a mouse
 %occl_trials = {16:25, 16:25, 16:25, 16:25, 16:25, 16:25, 16:25, 16:25};
 %ctl2_trails = {100:103
-nMice = length(perMouseData);
-nRows = ceil(sqrt(nMice));
-fh = figure; hold on;
-for ii = 1:nMice
-    rew_free = perMouseData(ii).rew_dists_from_trail_persect(ctl_trials{ii});
-    dist_free = perMouseData(ii).distract_dists_from_trail_persect(ctl_trials{ii});
-    rew_occ = perMouseData(ii).rew_dists_from_trail_persect(occr_trials{ii});
-    dist_occ = perMouseData(ii).distract_dists_from_trail_persect(occr_trials{ii});
-    
-    figure(fh);
-    ah = subplot(nRows, nRows, ii); %square, many panels
-    plotDistanceHistComparison(rew_free, dist_free, rew_occ, dist_occ, following_thresh, '', ah);
-    axes(ah); title(mouse_names{ii});
-end
+
+% nMice = length(perMouseData);
+% nRows = ceil(sqrt(nMice));
+% fh = figure; hold on;
+% for ii = 1:nMice
+%     rew_free = perMouseData(ii).rew_dists_from_trail_persect(ctl_trials{ii});
+%     dist_free = perMouseData(ii).distract_dists_from_trail_persect(ctl_trials{ii});
+%     rew_occ = perMouseData(ii).rew_dists_from_trail_persect(occr_trials{ii});
+%     dist_occ = perMouseData(ii).distract_dists_from_trail_persect(occr_trials{ii});
+%     
+%     figure(fh);
+%     ah = subplot(nRows, nRows, ii); %square, many panels
+%     plotDistanceHistComparison(rew_free, dist_free, rew_occ, dist_occ, following_thresh, '', ah);
+%     axes(ah); title(mouse_names{ii});
+% end
 
 %% Plot the average nose trajectories
 

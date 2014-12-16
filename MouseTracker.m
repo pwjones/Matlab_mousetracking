@@ -106,7 +106,7 @@ classdef MouseTracker < handle
                 disp(['Loading the saved object for: ' mat_fn]);
                 arg_vidFN = this.videoFN;
                 try
-                    saved = load(mat_fn)
+                    saved = load(mat_fn);
                 catch ME
                     disp(['Error loading: ' mat_fn]);
                 end

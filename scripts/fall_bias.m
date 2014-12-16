@@ -11,22 +11,17 @@ nMice = length(perMouseData);
 nRows = ceil(sqrt(nMice));
 fh = figure; hold on;
 for ii = 1:nMice
-    rew_free = perMouseData(ii).rew_dists_from_trail_persect(ctl_trials{ii});
-    for jj=1:length(rew_free)
-        rew_free{jj} = rew_free{jj};
-    end
-    rew_free2 = perMouseData(ii).rew_dists_from_trail_persect(ctl2_trials{ii});
-    for jj=1:length(rew_free2)
-        rew_free2{jj} = rew_free2{jj};
-    end
-    rew_occr = perMouseData(ii).rew_dists_from_trail_persect(occr_trials{ii});
-    for jj=1:length(rew_occr)
-        rew_occr{jj} =  rew_occr{jj};
-    end
-    rew_occl = perMouseData(ii).rew_dists_from_trail_persect(occl_trials{ii});
-    for jj=1:length(rew_occl)
-        rew_occl{jj} = rew_occl{jj};
-    end
+    %rew_free = perMouseData(ii).rew_dists_from_trail_persect(ctl_trials{ii});
+    rew_free = perMouseData(ii).rew_dists_from_trail(ctl_trials{ii});
+   
+    %rew_free2 = perMouseData(ii).rew_dists_from_trail_persect(ctl2_trials{ii});
+    rew_free2 = perMouseData(ii).rew_dists_from_trail(ctl2_trials{ii});
+    
+    %rew_occr = perMouseData(ii).rew_dists_from_trail_persect(occr_trials{ii});
+    rew_occr = perMouseData(ii).rew_dists_from_trail(occr_trials{ii});
+    
+    %rew_occl = perMouseData(ii).rew_dists_from_trail_persect(occl_trials{ii});
+    rew_occl = perMouseData(ii).rew_dists_from_trail(occl_trials{ii});
     
     all_free = cat(1, rew_free, rew_free2);
     

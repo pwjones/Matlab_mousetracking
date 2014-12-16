@@ -1,4 +1,4 @@
-function ret = loadMouseTracking(files, file_range, following_thresh)
+function ret = loadMouseTracking(files, file_range, following_thresh, varargin)
 % function loadMouseTracking(list_file, file_range)
 % 
 % Function to load a set of processed videos, their saved MouseTracker
@@ -9,6 +9,7 @@ base_fname = VIDEO_ROOT;
 class_func = @MouseTrackerKF;
 %class_func = @MouseTrackerUnder2;
 mm_conv = .862; %mm/px linear
+traj_wind = -30:30; 
 %%%%%%%%%%%%%%%% Start in on doing things  %%%%%%%%%%%%%%%%
 if ~iscell(files)
     fid = fopen(files, 'r');
@@ -19,6 +20,12 @@ if ~iscell(files)
     fclose(fid);
 else
     fnames = files;
+end
+
+if nargin >= 4
+    skeletonize = varargin{1};
+else
+    skeletonize = 1;
 end
 
 %select the subset of files that are desired
@@ -40,6 +47,8 @@ rew_dists_from_trail = cell(nfiles,1);
 distract_dists_from_trail = cell(nfiles,1);
 rew_dists_from_trail_persect = cell(nfiles,1);
 distract_dists_from_trail_persect = cell(nfiles,1);
+turning_traj = cell(nfiles,1);
+turning_dir = cell(nfiles, 1);
 nose_vel = cell(nfiles,1);
 body_vel = cell(nfiles,1);
 nose_trajectories = cell(nfiles,1);
@@ -70,7 +79,9 @@ for ii = 1:nfiles
     %mt = class_func(fullname, [],[starts(ii) ends(ii)]); 
     mt = class_func(fullname, [],[]); 
     mt.mm_conv = .862;
-    mt.makePathsSkel();
+    if skeletonize
+        mt.makePathsSkel();
+    end
 %    mt.plotFollowing([], following_thresh, 0);
     rew_prop(ii) = mt.propTimeOnTrail([],1,following_thresh);
     dist_prop(ii) = mt.propTimeOnTrail([],2,following_thresh);
@@ -81,6 +92,7 @@ for ii = 1:nfiles
     distract_dists_from_trail{ii} = mt.orthogonalDistFromTrail(1:mt.nFrames,2) * mm_conv;
     rew_dists_from_trail_persect{ii} = mt.orthogonalDistFromTrailPerSection(1:mt.nFrames,1, following_thresh) * mm_conv;
     distract_dists_from_trail_persect{ii} = mt.orthogonalDistFromTrailPerSection(1:mt.nFrames,2, following_thresh) * mm_conv;
+    [~, turning_dir{ii}, turning_traj{ii}] = mt.findFollowingTurns([], 1, following_thresh, traj_wind);
     total_turning(ii) = mt.totalTurning(1:mt.nFrames);
     [nose_trajectories{ii}, traj_dir{ii}, traj_window] = noseTrajectories(mt, -20:40);
     % now collect a few factors about each of the movies
@@ -123,6 +135,8 @@ ret.dir_nums = dir_nums;
 ret.nose_trajectories = nose_trajectories;
 ret.traj_window = traj_window;
 ret.traj_dir = traj_dir;
+ret.turning_traj = turning_traj;
+ret.turning_dir = turning_dir;
 ret.file_names = file_names;
 ret.nose_vel = nose_vel;
 ret.body_vel = body_vel;
