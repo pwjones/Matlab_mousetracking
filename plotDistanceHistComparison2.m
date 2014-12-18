@@ -43,8 +43,11 @@ xbins = linspace(-dist_thresh, dist_thresh, nbins);
 for ii=1:2
     counts{ii} = hist(distance_comp{ii}, xbins);
     [muhat(ii), sigmahat(ii)] = normfit(distance_comp{ii});
+    mu(ii) = nanmean(distance_comp{ii});
+    sigma(ii) = nanstd(distance_comp{ii});
 end
 disp(['Fitted Gaussians have means: ' num2str(muhat) '  And stds: ' num2str(sigmahat)]);
+disp(sprintf('Data distributions have Means: %s   And STDs: %s', num2str(mu), num2str(sigma)));
 % plotting things
 xl = [-dist_thresh dist_thresh];  %limits
 yl = max([counts{1,1}./sum(counts{1,1}), counts{2,1}./sum(counts{2,1})]); yl = [0 yl+(yl/5)];
@@ -53,8 +56,9 @@ figure; ah = axes; hold on;
 % Plotting PDFs 
 for ii =1:2
     xmed = double(median(distance_comp{ii}));
-    line([xmed xmed], [0 yl(2)], 'Color',plotColors{ii}, 'LineStyle', '--'); 
-    text(xmed, yl(2), ['median: ' num2str(xmed)], 'Color', plotColors{ii});
+    xmean = mu(ii);
+    line([xmean xmean], [0 yl(2)], 'Color',plotColors{ii}, 'LineStyle', '--'); 
+    text(xmean, yl(2), ['Mean: ' num2str(xmean)], 'Color', plotColors{ii});
     line(xbins, counts{1}./sum(counts{ii}), 'Color', plotColors{1}, 'LineStyle', '-', 'LineWidth', 2);
     gfit = normpdf(xbins, muhat(ii), sigmahat(ii));
     line(xbins, gfit./sum(gfit), 'Linestyle', '--', 'color','k');

@@ -24,8 +24,10 @@ occl_trials =  {73:103,     143:163,    [],     141:160,    146:186,    80:118, 
 train_dirs = {1:15,  1:15,  1:15,    1:15,  1:15,  1:15,  1:15}; % Initial training
 ctl_dirs = {16:23,  16:23,  16:22,  16:23,  16:22, 16:22, 16:23}; % Control behavior
 ctl2_dirs = {35:44, 35:44,  35:44,  35:44,  35:44,    [],    35:44}; % Control behavior period 2
+
 occr_dirs = {45:55, 24:34,  24:34,  24:34,  23:34,    [],     [] }; % Occlude R nares
 occl_dirs = {24:34, 45:55,  [],     45:55,  45:55, 23:34,     [] }; % Occlude L nares
+
 occ1_dirs = {24:34, 24:34,  24:34,  24:34,  23:34, 23:34,     [] }; % First occlusion
 occ2_dirs = {45:55, 45:55,  [],     45:55,  45:55,    [],     [] }; % Second occlusion
 

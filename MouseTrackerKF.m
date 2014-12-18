@@ -2,7 +2,7 @@ classdef MouseTrackerKF < MouseTracker
     properties
         default_thresh = 0;
         used_thresh = 0;
-        p_mouse = .001; %the proportion of pixels that are 
+        p_mouse = .0007; %the proportion of pixels that are 
         kf = struct('nstates', {}, 'nob', {}, 's', {});
         mm_conv = .862; %mm/px linear
         fullPaths; %the full detected paths, to be saved if the paths are skeletonized
@@ -658,7 +658,6 @@ classdef MouseTrackerKF < MouseTracker
         % -----------------------------------------------------------------------------------------------
         function detectMouseInSection(this, segFrames, frameArray)
             
-            err_thresh = 6;
             dbg = 0;
             cb = 0;
             
@@ -1641,7 +1640,7 @@ classdef MouseTrackerKF < MouseTracker
         % function findFollowingTurns(this, frames, pathNum, threshDist)
         % -----------------------------------------------------------------------------------------------------
         function [turnFrames, dir, dists] = findFollowingTurns(this, frames, pathNum, threshDist, wind)
-            pb = 0;
+            pb = 1;
             vel_conv = this.mm_conv * this.frameRate;
             if pb
                 figure; hold on;
@@ -1682,7 +1681,13 @@ classdef MouseTrackerKF < MouseTracker
                 dists(inRange, ii)=temp_dists;
             end
         end
-            
+        
+        % -----------------------------------------------------------------------------------------------------
+        function propNose = proportionFramesWithNose(this)
+            np = this.nosePos(:,1);
+            propNose = sum(~isnan(np))/this.nFrames;
+        end
+        
         % ------------------------------------------------------------------------------------------------------
         function meanDist = meanOrthogonalDistFromTrail(this, frames, pathNum)
         % function dists = meanOrthogonalDistFromTrail(this, frames, pathNum, threshDist)
@@ -2030,9 +2035,10 @@ classdef MouseTrackerKF < MouseTracker
         %         movieType - string either 'orig' for original movie, 'diff' for the difference, or 'bin' for the
         %         binary
         %         varargin - a threshold value if you want to specify that for a binary movie 
+            frames = unique(frames(:));
             [frame_ints, flag] = this.listToIntervals(frames);
             rawArray = this.readFrames(frame_ints, flag);
-            if (size(rawArray,3) ~= length(frames(:)))
+            if (size(rawArray,3) ~= length(frames))
                 disp('In MouseTrackerKF.readMovieSection: readFrames has returned an array of different length than requested');
                 s3 = size(rawArray,3);
                 frames = 1:s3;
@@ -2072,11 +2078,15 @@ classdef MouseTrackerKF < MouseTracker
         end
         
         % ---------------------------------------------------
-        function rethreshold(this, frameRange, threshold)
-        % Setting the threshold differently in order to improve blob identification
-            this.default_thresh = threshold;
-            mArray = this.readMovieSection([frameRange(1) frameRange(end)], 'bin');
+        function rethreshold(this, frameRange, p_mouse)
+            % Setting the threshold differently in order to improve blob identification
+        
+            % There are two ways that we can specify thresholds - either directly or using the p_mouse
+            % variable, which sets the threshold so that a p_mouse proportion of pixels are above it. 
+            % p_mouse takes precedence.   
             
+            this.p_mouse = p_mouse;
+            this.findMouse(frameRange);
         end
         % ---------------------------------------------------------------------------
         function [ret_mov, avg_frame, thresh, fc_val] = processFrameArray(this, rawArray, frame_range, subFrame, movieType, varargin)
@@ -2094,7 +2104,9 @@ classdef MouseTrackerKF < MouseTracker
             
             %Image Processing Settings
             %thresh(1) = .1; % the threshold level
-            p_mouse = .0007; %the prior probability of a mouse pixel.  Influences the threshold.
+            p_mouse = this.p_mouse;
+            %p_mouse = .0007; %the prior probability of a mouse pixel.  Influences the threshold.
+            
             erode_size = 3; %the size of erosion mask
             do_hpfilter = 1; %flag for highpass filtering
             alpha = .5; %The parameter for an unsharp filter - subtracts a blurred image from the image to sharpen original
@@ -2127,6 +2139,9 @@ classdef MouseTrackerKF < MouseTracker
             thresh = this.default_thresh; %.08-.12 have worked well after image normalization
             if ~isempty(varargin) && ~isempty(varargin{1}) % I'm not exactly sure MATLAB is making empty cells
                 thresh = varargin{1}; 
+                if nargin > 6 %p_mouse input
+                    p_mouse = varargin{2};
+                end
                 if thresh == 0
                     % The way we are determining the threshold value is to take the brightest p_mouse
                     % proportion of pixels

@@ -6,7 +6,7 @@ fallCohortList; % this script contains the mouse and file names to be included i
 base_folder = VIDEO_ROOT;
 following_thresh = 20; %px
 mm_conv = .862; %mm/px
-skeletonize_paths = 0;
+skeletonize_paths = 1;
 clear perMouseData;
 
 [videoList, folder_nums, day_nums] = listBehavioralVideos(base_folder, folders, mouse_names);

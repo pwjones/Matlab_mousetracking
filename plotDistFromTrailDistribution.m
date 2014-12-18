@@ -21,7 +21,7 @@ dr = [.8 0 0]; %darker red
 plotColors = {[0 0 0],dr, dg, [1 0 1]};
 nfiles = length(dist_cell);
 rew = {dist_cell};
-distance_comp = cell(1,1);
+all_dists = [];
 
 ii =1;
 trials = nfiles(ii);
@@ -31,46 +31,30 @@ for jj=1:trials
     dists = r_trials{jj};
     inci = (abs(dists) <= dist_thresh) & ~isnan(dists) & (abs(dists) >= min_dist);
     dists = dists(inci);
-    distance_comp{ii} = cat(1, distance_comp{ii}, dists(:));
+    all_dists = cat(1, all_dists, dists(:));
 end
     
-counts = cell(1,1); %want to do a reward/distractor, early/late comparison
 nbins = 10*dist_thresh;
-dx = .5;
-%anonPDF = @(x,xdata)cauchyPDF2(xdata, x(1), x(2));
-%anonPDF = @(x,xdata)nctpdf(xdata, x(2), x(1)); % the mean and width parameters are switched
 mlePDF = @cauchyPDF2;
 mleCDF = @cauchyCDF2;
-%mlePDF = @normpdf;
-%mleCDF = @normcdf;
-%xbins = linspace(-dist_thresh, dist_thresh, nbins);
+
 xbins = linspace(0,dist_thresh,floor(nbins/2)+1); %might be an easier way - symmetric vector around 0
 rev = -xbins(2:end); xbins = [rev(end:-1:1), xbins];
-x0 = [nanmean(distance_comp{1}), 1]; 
-opts =  optimset('MaxFunEvals', 5000, 'TolFun', 1e-15, 'MaxIter', 10000, 'Diagnostics', 'on');
-%xcenters = (dx*(0:(length(xbins)-1))) - dist_thresh + (dx/2);
-counts = hist(distance_comp{1}, xbins);
-%zeroi = find(xbins > 0, 1,'first'); %jsut a test for what is messing up fits
-%max_count = max(counts);
-%counts((zeroi-1):zeroi) = max_count;
+x0 = [nanmean(all_dists), 1]; 
+% make a PDF of the distribution of distances
+counts = hist(all_dists, xbins);
 count_dist = counts./nansum(counts);
-fit_params = [0 1]; fit_paramsCDF = [0,1];
-%[fit_params, resnorm,residual,exitflag,output,lambda,jacobian] = lsqcurvefit(anonPDF, double(x0), xbins, count_dist,[],[10 10],opts);
-mle_fit_params = mle(distance_comp{1}, 'pdf', mlePDF, 'start', double(x0), 'cdf', mleCDF);
-%[mle_fit_params(1), mle_fit_params(2)] = normfit(distance_comp{1});
-%anonCDF = @(x,xdata)cauchyCDF2(xdata, x(1), x(2));
-%anonCDF = @(x,xdata)nctcdf(xdata, x(2), x(1));
-[f, xcdf] = plotEmpiricalCDF(distance_comp(ii), .2, plotColors(ii), plotOptions(ii), cdf_ah);
-%[fit_paramsCDF, resnorm,residual,exitflag,output,lambda,jacobian] = lsqcurvefit(anonCDF, double(x0), double(xcdf), double(f),[],[10 30],opts);
-% use mle rather than lsqcurvefit
-%gfit = anonCDF(fit_params, xbins);
-%line('parent', cdf_ah,'xdata',xbins, 'ydata', gfit, 'Linestyle', '--', 'color','r');
+
+% use mle rather than lsqcurvefit for fitting a distribution - it's supposedly the right 
+mle_fit_params = mle(all_dists, 'pdf', mlePDF, 'start', double(x0), 'cdf', mleCDF);
+[f, xcdf] = plotEmpiricalCDF({all_dists}, .2, plotColors(ii), plotOptions(ii), cdf_ah);
 gfit = mleCDF(xbins, mle_fit_params(1), mle_fit_params(2));
 line('parent', cdf_ah,'xdata',xbins, 'ydata', gfit, 'Linestyle', '--', 'color','r');
-   
-%disp(['Fitted Anon dist PDF has parameters: ' num2str(fit_params(1)) '  And width: ' num2str(fit_params(2))]);
-%disp(['Fitted Anon dist CDF has parameters: ' num2str(fit_paramsCDF(1)) '  And width: ' num2str(fit_paramsCDF(2))]);
-disp(['Fitted MLE dist CDF has parameters: ' num2str(mle_fit_params(1)) '  And width: ' num2str(mle_fit_params(2))]);
+disp(sprintf('Full Mean: %.3f   SD: %.3f', nanmean(all_dists), nanstd(all_dists)));
+tail_dists = all_dists(all_dists ~= 0);
+disp(sprintf('Tail Data Mean: %.3f   SD: %.3f', nanmean(tail_dists), nanstd(tail_dists)));
+disp(['\nMLE Fitted Cauchy dist has parameters: ' num2str(mle_fit_params(1)) '  And width: ' num2str(mle_fit_params(2))]);
+
 
 % Plotting limits
 xl = [-dist_thresh dist_thresh];  
@@ -81,7 +65,7 @@ figure; ah = axes; hold on;
 for ii =1:1
     % The PDF 
     line(xbins, count_dist, 'Color', plotColors{ii}, 'LineStyle', '-', 'LineWidth', 2);
-    xmed = double(median(distance_comp{ii})); 
+    xmed = double(median(all_dists)); 
     line([xmed xmed], [0 yl(2)], 'Color',plotColors{ii}, 'LineStyle', '--'); 
     text(xmed, yl(2), ['median: ' num2str(xmed)], 'Color', plotColors{ii});
     % The fitted function
