@@ -22,7 +22,7 @@ function varargout = reviewTracking(varargin)
 
 % Edit the above text to modify the response to help reviewTracking
 
-% Last Modified by GUIDE v2.5 18-Dec-2014 14:29:47
+% Last Modified by GUIDE v2.5 19-Dec-2014 12:43:53
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -450,7 +450,6 @@ function rethreshHigher_btn_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 handles.mouseProb = max(handles.mouseProb-.0001,0);
 set(handles.mouseProb_edit, 'String', num2str(handles.mouseProb));
-handles = rethreshold(hObject, eventdata, handles);
 guidata(hObject, handles);
 
 % --- Executes on button press in rethreshLower_btn.
@@ -460,7 +459,6 @@ function rethreshLower_btn_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 handles.mouseProb = min(handles.mouseProb+.0001,1);
 set(handles.mouseProb_edit, 'String', num2str(handles.mouseProb));
-handles = rethreshold(hObject, eventdata, handles);
 guidata(hObject, handles);
 
 
@@ -472,13 +470,22 @@ function mouseProb_edit_Callback(hObject, eventdata, handles)
 % Hints: get(hObject,'String') returns contents of mouseProb_edit as text
 %        str2double(get(hObject,'String')) returns contents of mouseProb_edit as a double
 handles.mouseProb = str2double(get(hObject,'String'));
-handles = rethreshold(hObject, eventdata, handles);
 guidata(hObject, handles);
 
 % ---Called whenever the threshold is adjusted---------------
 function handles = rethreshold(hObject, eventdata, handles)
 
-handles.tracker.rethreshold(handles.currFrame, handles.mouseProb);
+if get(handles.useRange_checkbox, 'Value') == 1
+    lower = str2double(get(handles.threshFramesLower_edit,'String'));
+    upper = min(str2double(get(handles.threshFramesUpper_edit,'String')), handles.tracker.nFrames);
+    frames = lower:upper;
+    if isempty(frames)
+        disp('Invalid Frame Range');
+    end
+else
+    frames = handles.currFrame;
+end
+handles.tracker.rethreshold(frames, handles.mouseProb);
 handles = changeFrame(hObject, handles, handles.currFrame);
 
 % --- Executes during object creation, after setting all properties.
@@ -492,3 +499,66 @@ function mouseProb_edit_CreateFcn(hObject, eventdata, handles)
 if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
 end
+
+
+% --- Executes on button press in rethresh_btn.
+function rethresh_btn_Callback(hObject, eventdata, handles)
+% hObject    handle to rethresh_btn (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+handles = rethreshold(hObject, eventdata, handles);
+guidata(hObject, handles);
+
+
+function threshFramesLower_edit_Callback(hObject, eventdata, handles)
+% hObject    handle to threshFramesLower_edit (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of threshFramesLower_edit as text
+%        str2double(get(hObject,'String')) returns contents of threshFramesLower_edit as a double
+
+
+% --- Executes during object creation, after setting all properties.
+function threshFramesLower_edit_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to threshFramesLower_edit (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+
+function threshFramesUpper_edit_Callback(hObject, eventdata, handles)
+% hObject    handle to threshFramesUpper_edit (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of threshFramesUpper_edit as text
+%        str2double(get(hObject,'String')) returns contents of threshFramesUpper_edit as a double
+
+
+% --- Executes during object creation, after setting all properties.
+function threshFramesUpper_edit_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to threshFramesUpper_edit (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+% --- Executes on button press in useRange_checkbox.
+function useRange_checkbox_Callback(hObject, eventdata, handles)
+% hObject    handle to useRange_checkbox (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hint: get(hObject,'Value') returns toggle state of useRange_checkbox

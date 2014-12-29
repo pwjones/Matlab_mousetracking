@@ -822,7 +822,7 @@ classdef MouseTrackerKF < MouseTracker
                     % going to find the blob with the highest eccentricity to be the tail
                     ecc = [regions.MajorAxisLength]./[regions.MinorAxisLength];
                     [max_ecc, maxi] = nanmax(ecc);
-                    if max_ecc>4.5 && regions(maxi).Area > 100%this is just an empirically defined threshold value
+                    if max_ecc>4.5 && regions(maxi).Area > 60%this is just an empirically defined threshold value
                         this.tailVisible(fi) = 1;
                         this.tailblob(fi) = maxi;
                     else
