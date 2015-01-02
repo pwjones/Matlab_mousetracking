@@ -25,7 +25,7 @@ for ii = 1:nMice
         sel = (dir_arr == dl(jj))';
         mean_turns(:,jj) = nanmean(free(:,sel),2);
     end
-    subplot(nRows, nMice/nRows, ii);
+    subplot(nRows, ceil(nMice/nRows), ii);
     plot(mean_turns, 'k'); hold on;
     
     %rew_free2 = perMouseData(ii).turning_traj(ctl2_trials{ii});
@@ -64,6 +64,10 @@ for ii = 1:nMice
         mean_turns(:,jj) = nanmean(occl(:,sel),2);
     end
     plot(mean_turns, 'b');
+    
+    if (ii == 1)
+        
+    end
     
 %     all_free = cat(1, rew_free, rew_free2);
 %     

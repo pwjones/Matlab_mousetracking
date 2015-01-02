@@ -1640,7 +1640,7 @@ classdef MouseTrackerKF < MouseTracker
         % function findFollowingTurns(this, frames, pathNum, threshDist)
         % -----------------------------------------------------------------------------------------------------
         function [turnFrames, dir, dists] = findFollowingTurns(this, frames, pathNum, threshDist, wind)
-            pb = 1;
+            pb = 0;
             vel_conv = this.mm_conv * this.frameRate;
             if pb
                 figure; hold on;
