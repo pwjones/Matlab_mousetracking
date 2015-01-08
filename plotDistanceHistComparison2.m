@@ -6,19 +6,25 @@ function plotDistanceHistComparison2(dist_cell, dist_cell2, dist_thresh, plotOpt
 % specified by varargin. Plot options is a cell array for the linestyles (1,2) and the colors (3,4) of the cdf
 % traces.
 min_dist = 0; %.75;
+%defining colors
+dg = [0 .8 0]; %darker green
+dr = [.8 0 0]; %darker red
+plotColors = {[0 0 0],dr, dg, [1 0 1]};
 
+%Checking variable arguments
 if ~isempty(varargin)
     cdf_ah = varargin{1};
 else
     figure; cdf_ah = axes; hold on;
 end
+if nargin > 5 %2 or more variable args
+    plotColors = varargin{2};
+end
 if isempty(plotOptions)
    plotOptions = {'-','-','--','--'}; 
 end
-%defining colors
-dg = [0 .8 0]; %darker green
-dr = [.8 0 0]; %darker red
-plotColors = {[0 0 0],dr, dg, [1 0 1]};
+
+
 nfiles = [length(dist_cell); length(dist_cell2)];
 rew = {dist_cell, dist_cell2};
 distance_comp = cell(2,1);
@@ -59,9 +65,11 @@ for ii =1:2
     xmean = mu(ii);
     line([xmean xmean], [0 yl(2)], 'Color',plotColors{ii}, 'LineStyle', '--'); 
     text(xmean, yl(2), ['Mean: ' num2str(xmean)], 'Color', plotColors{ii});
-    line(xbins, counts{1}./sum(counts{ii}), 'Color', plotColors{1}, 'LineStyle', '-', 'LineWidth', 2);
+    line([xmed xmed], [0 yl(2)], 'Color',plotColors{ii}, 'LineStyle', '-'); 
+    text(xmed, yl(2), ['Median: ' num2str(xmed)], 'Color', plotColors{ii});
+    line(xbins, counts{ii}./sum(counts{ii}), 'Color', plotColors{ii}, 'LineStyle', '-', 'LineWidth', 2);
     gfit = normpdf(xbins, muhat(ii), sigmahat(ii));
-    line(xbins, gfit./sum(gfit), 'Linestyle', '--', 'color','k');
+    line(xbins, gfit./sum(gfit), 'Linestyle', ':', 'color',plotColors{ii});
 end
 
 % KS test the distributions

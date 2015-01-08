@@ -6,6 +6,11 @@
 %occr_trials = {73:103, 77:107, 74:111, 75:104, 26:35, 26:36, 26:35, 26:35}; %each cell is a mouse
 %occl_trials = {16:25, 16:25, 16:25, 16:25, 16:25, 16:25, 16:25, 16:25};
 %ctl2_trails = {100:103
+dk = [ 0 0 0];
+dg = [.3 .3 .3];
+db = [0 0 .8]; %darker green
+dr = [.8 0 0]; %darker red
+plotColors = {[0 0 0],db, db, dg, [1 0 1]};
 mm_conv = .862; %mm per px
 nMice = length(perMouseData);
 nRows = ceil(sqrt(nMice));
@@ -29,17 +34,17 @@ for ii = 1:nMice
     ah = subplot(nRows, nRows, ii); %square, many panels
     hold on;
     if(~isempty(rew_occr))
-        plotDistanceHistComparison2(rew_free, rew_occr, following_thresh*mm_conv, '', ah);
+        plotDistanceHistComparison2(rew_free, rew_occr, following_thresh*mm_conv, '', ah, {dk, db});
         [p,h] = testCellArrayMedians(all_free, rew_occr);
         disp(sprintf(' \nWilcoxon test for different medians (right occlusion): h = %f, p = %f\n', h, p)); 
     end
     if(~isempty(rew_occl))
-        plotDistanceHistComparison2(rew_free, rew_occl, following_thresh*mm_conv, '', ah);
+        plotDistanceHistComparison2(rew_free, rew_occl, following_thresh*mm_conv, '', ah, {dk, dr});
         [p,h] = testCellArrayMedians(all_free, rew_occl);
         disp(sprintf(' \nWilcoxon test for different medians (left occlusion): h = %f, p = %f\n', h, p)); 
     end
     if(~isempty(rew_free2))
-        plotDistanceHistComparison2(rew_free, rew_free2, following_thresh*mm_conv, '', ah);
+        plotDistanceHistComparison2(rew_free, rew_free2, following_thresh*mm_conv, '', ah, {dk, dg});
     end
     axes(ah); title(mouse_names{ii});
 end

@@ -11,6 +11,8 @@ classdef MouseTrackerKF < MouseTracker
         trackingStruct; %structure used to save external tracking info
         trailShadow = [];
         trailShadow_size = 20;
+        pathVerticesDefined = 0;
+        pathVertices;
     end
     
     methods
@@ -262,7 +264,7 @@ classdef MouseTrackerKF < MouseTracker
                     line('Parent', ah, 'Xdata', this.nosePos(fi,1), 'Ydata', ...
                         this.nosePos(fi,2), 'Marker', '.', 'MarkerSize', 10, 'Color', plotblue);
 %                     if(mod(ii, 50) == 0)
-%                         text(np(1)+5, np(2)+5, num2str(fi));
+%                        text(np(1)+5, np(2)+5, num2str(fi));
 %                     end
                     %line('Parent', ah, 'Xdata', this.nosePos(fi,1), 'Ydata', ...
                     %    this.nosePos(fi,2), 'Marker', '.', 'MarkerSize', 10, 'Color', 'w');
@@ -381,7 +383,9 @@ classdef MouseTrackerKF < MouseTracker
                 plot(np(posd,1), np(posd,2), '.m', 'MarkerSize',10);
                 plot(np(negd,1), np(negd,2), '.y', 'MarkerSize',10);
                 if textflag
-                    text(mean(np(:,1)), mean(np(:,2)), num2str(dists(i)), 'Color', 'w', 'FontSize', 12);
+                    for jj = 1:length(range)
+                        text(np(jj,1), np(jj,2), num2str(signed_dists(jj)), 'Color', 'w');
+                    end
                 end
             end
             ah = gca;
@@ -1297,6 +1301,7 @@ classdef MouseTrackerKF < MouseTracker
             this.detectPaths(time, absoluteTime, useAvgFrame, imAx);
             this.refinePaths(1);
             this.refinePaths(2);
+            this.generatePathVertices();
         end
         
          % ------------------------------------------------------------------------------------------------------ 
@@ -1307,12 +1312,14 @@ classdef MouseTrackerKF < MouseTracker
             for ii = 1:length(this.paths)
                 this.paths(ii) = skeletonizePath(this.paths(ii), this.width, this.height);
             end
+            this.generatePathVertices();
         end
          % ------------------------------------------------------------------------------------------------------ 
         function makePathsFull(this)
             if ~isempty(this.fullPaths)
                 this.paths = this.fullPaths;
                 this.fullPaths = [];
+                this.generatePathVertices();
             else
                 disp('There is no fullPaths field.');
             end
@@ -1322,6 +1329,39 @@ classdef MouseTrackerKF < MouseTracker
             if ~isempty(this.paths)
                 this.makePathsSkel();
                 this.trailShadow = findAllPointsWithinDistance(this.paths(pathNum).PixelList, 20);
+            end
+        end
+        % ------------------------------------------------------------------------------------------------------
+        function generatePathVertices(this)
+            % function generatePathAreas(this)
+            %
+            % So, detecting the distance of a floating point (effectively analog) position from a pixel
+            % based area is not as simple as euclidean distance. Each pixel is defined by a "position" that 
+            % the center of that square but is actually an area.  In order to overcome that, we use positional
+            % vertices to define the area that we want to compute the distance from.  This computes that
+            % area from a list of pixel positions.
+            this.pathVertices = this.paths;
+            for ii = 1:length(this.paths)
+                px = this.paths(ii).PixelList;
+                vert = NaN*zeros(size(px,1)*4, 2); %upper bound is 4 times the px
+                vi = 1;
+                for jj = 1:size(px,1)
+                    pxt = px(jj,:);
+                    vert(vi,:)   = [pxt(1)-.5, pxt(2)-.5]; %left, top
+                    vert(vi+1,:) = [pxt(1)+.5, pxt(2)-.5]; %right, top
+                    vert(vi+2,:) = [pxt(1)-.5, pxt(2)+.5]; %left, bottom
+                    vert(vi+3,:) = [pxt(1)+.5, pxt(2)+.5]; %right, bottom
+                    vi = vi+4;
+                end
+                uv = unique(vert, 'rows', 'R2012a');
+                num = size(uv,1);
+                uvx = sub2ind(size(this.avgFrame), uv(:,2), uv(:,1));
+                this.pathVertices(ii).Area = num;
+                this.pathVertices(ii).PixelList = uv;
+                this.pathVertices(ii).PixelIdxList = uvx;
+            end
+            if ~isempty(this.pathVertices)
+                this.pathVerticesDefined = 1;
             end
         end
         % ------------------------------------------------------------------------------------------------------
@@ -1493,9 +1533,12 @@ classdef MouseTrackerKF < MouseTracker
             if isempty(frames)
                 frames = 1:this.nFrames;
             end
+            if ~this.pathVerticesDefined
+                this.generatePathVertices();
+            end
             if (length(this.paths) >= pathNum)
                 nosePos = this.nosePos(frames,:);
-                trailPos = this.paths(pathNum).PixelList;
+                trailPos = this.pathVertices(pathNum).PixelList;
                 distm = ipdm(single(nosePos), single(trailPos));
                 %distm = ipdm(nosePos, trailPos, 'Subset', 'SmallestFew', 'limit', 10);
                 % Must figure out if the animals' nose is over the trail or not. Do this by getting the 4
@@ -1522,14 +1565,14 @@ classdef MouseTrackerKF < MouseTracker
                 
                 vects = closestTrailP(:,:,1) - nosePos;
             else % if there are no paths return zeros, but if there are return a mock path result
-                if isempty(this.paths)
+                if isempty(this.pathVertices)
                     noseDist = NaN*zeros(length(frames), 1);
                     vects = NaN*zeros(length(frames), 2);
                     disp([this.videoFN ': noseDistToTrail']);
                     disp('There must be a detected path to calculate distances');
                 else %make a fake trail
                     nosePos = this.nosePos(frames,:);
-                    fakeTrail = this.makeMirrorPath(this.paths(1));
+                    fakeTrail = this.makeMirrorPath(this.pathVertices(1));
                     trailPos = fakeTrail.PixelList;
                     distm = ipdm(single(nosePos), single(trailPos));
                     [noseDist, mini] = nanmin(distm, [], 2);
@@ -1557,12 +1600,14 @@ classdef MouseTrackerKF < MouseTracker
         % large numbers of frames at once.  Thus it is recommended that the
         % frames be selected prior to calling this method rather than
         % performing this on a whole movie worth of frames.
+            if ~this.pathVerticesDefined
+                this.generatePathVertices();
+            end
             if (length(this.paths) >= pathNum)
                 nosePos = this.nosePos(frames,:);
-                trailPos = this.paths(pathNum).PixelList;
+                trailPos = this.pathVertices(pathNum).PixelList;
                 for ii = 1:size(nosePos,1)
                     distm = ipdm(nosePos, trailPos);
-                    nose
                 end
             else
                 vects = NaN*zeros(length(frames), 2);
