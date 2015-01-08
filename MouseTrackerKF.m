@@ -378,8 +378,8 @@ classdef MouseTrackerKF < MouseTracker
                 np = this.nosePos(range, :);
                 %incorporate the side of the trail coloring
                 signed_dists = this.orthogonalDistFromTrail(range,1);
-                negd = signed_dists <= -1;
-                posd = signed_dists >= 1;
+                negd = signed_dists < 0;
+                posd = signed_dists > 0;
                 plot(np(posd,1), np(posd,2), '.m', 'MarkerSize',10);
                 plot(np(negd,1), np(negd,2), '.y', 'MarkerSize',10);
                 if textflag
@@ -876,46 +876,7 @@ classdef MouseTrackerKF < MouseTracker
                 this.noseblob(frames(fi)) = noseblob(fi);
                 this.propogateNosePosition(frames(fi));
             end
-%             for ii = 1:length(frames)
-%                 fi = frames(ii);
-%                 regions = this.areas(fi,:);
-%                 ids = this.blobID(fi,:);
-%                 maxo = 0;
-%                 if fi > 1 && ~isnan(this.noseblob(fi-1)) %finding similarity with previously id'd nose 
-%                     if (ii == 1) prev_nb = this.noseblob(fi-1);
-%                     else prev_nb = noseblob(ii-1);
-%                     end
-%                     prev_noseID = this.blobID(fi-1,prev_nb);
-%                     id_match = find(prev_noseID == ids);
-%                 end
-%                 if ~isempty(id_match) %nearly all non-nose blobs have zero overlap with a well defined nose
-%                     noseblob(ii) = id_match;
-%                 elseif (this.nblobs(fi) >= 3) %only works if there are enough things to track
-%                     if this.tailVisible(fi) && (this.nblobs(fi) > 2)%we can only do this first method if the tail is present
-%                         % compute the vector from tail to body center
-%                         bodyVect = this.bodyCOM(fi,:) - this.areas(fi,this.tailblob(fi)).Centroid;
-%                         dist = [];
-%                         for jj=1:this.nblobs(fi)
-%                             areaVect = this.areas(fi,jj).Centroid - this.areas(fi,this.tailblob(fi)).Centroid;
-%                             dist(jj) = dot(areaVect, bodyVect);
-%                         end
-%                         [maxd, maxi] = max(dist); %the maximum distance and ind along tail-body vector of each blob  
-%                         noseblob(ii) = maxi; 
-%                          % The nose is the farthest along vector
-%                     end
-%                 end
-%                 if ~isnan(noseblob(ii))
-%                     nosePos(ii,:) = this.areas(fi,noseblob(ii)).Centroid;
-%                 end
-%             end
-%             % putting in a maximum distance criterion of 50 px away from last frame
-%             %maximum instantanous velocity
-%             max_vel = 1200; %px/sec = distance*frame rate
-%             dists = diff(nosePos,1,1);
-%             dists = sqrt(sum(dists.^2,2));
-%             toofar = dists*this.frameRate > max_vel;
-%             nosePos(toofar,:) = NaN*zeros(sum(toofar), 2);
-%             
+ 
             %let's assign the vectors
             this.nosePos(frames,:) = nosePos;
             this.noseblob(frames) = noseblob;
@@ -944,7 +905,11 @@ classdef MouseTrackerKF < MouseTracker
                     end
                 end
                 %bodyCOM(i, :) = mean(this.COM(fi,:,:),3);
-                bodyCOM(i, :) = mean(temp_pos);
+                if isempty(temp_pos)
+                    bodyCOM(i,:) = [NaN NaN];
+                else
+                    bodyCOM(i, :) = mean(temp_pos,1);
+                end
             end
         end
         
@@ -1545,25 +1510,20 @@ classdef MouseTrackerKF < MouseTracker
                 % closest trail points to each nose position and see if they encircle it.
                 noseDist = NaN*zeros(size(nosePos,1),4); 
                 closestTrailP = ones(size(nosePos,1),2,4);
-                for ii = 1:4
+                for ii = 1:6
                     [noseDist(:,ii), mini] = nanmin(distm, [], 2); %get the minimum value
                     li = sub2ind(size(distm), (1:size(nosePos,1))', mini);
-                    distm(li) = NaN; %set the mins to NaN to get the next closest
+                    distm(li) = NaN; %set the mins to NaN to get the next closest on next iteration
                     closestTrailP(:,:,ii) = trailPos(mini, :);
                 end
-                %nosePos3 = repmat(nosePos, [1, 1, 4]);
-                %posDiff = nosePos3-closestTrailP;
-                pass = noseDist <= sqrt(2);
-                over = (sum(pass,2) == 4) & (sum(noseDist,2) <= 2+sqrt(2));
-                %dd = abs(posDiff) <= 1;
-                %over = sum(sum(dd,3),2) == 8;
-                %over = abs(posDiff) < .01;
-                %over = (noseDist+noseDist2) <= sqrt(2); % frames where the nose is between two trail points
+                over = isContained(nosePos, closestTrailP);
+                %adjClosest = findShortestVector(nosePos, closestTrailP(:,:,1:2));
+                %noseDist = sqrt(nansum((nosePos - adjClosest).^2,2));
+                %vects = adjClosest - nosePos;
                 noseDist = noseDist(:,1);
-                noseDist(over) = 0; %set those points to zero because the nose IS over the trail itself
-                
-                
                 vects = closestTrailP(:,:,1) - nosePos;
+                
+                noseDist(over) = 0; %set those points to zero because the nose IS over the trail itself
             else % if there are no paths return zeros, but if there are return a mock path result
                 if isempty(this.pathVertices)
                     noseDist = NaN*zeros(length(frames), 1);
