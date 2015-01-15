@@ -383,9 +383,9 @@ classdef MouseTrackerKF < MouseTracker
                 plot(np(posd,1), np(posd,2), '.m', 'MarkerSize',10);
                 plot(np(negd,1), np(negd,2), '.y', 'MarkerSize',10);
                 if textflag
-                    for jj = 1:length(range)
-                        text(np(jj,1), np(jj,2), num2str(signed_dists(jj)), 'Color', 'w');
-                    end
+%                     for jj = 1:length(range)
+%                         text(np(jj,1), np(jj,2), num2str(signed_dists(jj)), 'Color', 'w');
+%                     end
                 end
             end
             ah = gca;

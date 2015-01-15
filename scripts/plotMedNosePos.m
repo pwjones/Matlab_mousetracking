@@ -23,7 +23,7 @@ med_nose_pos_occr = NaN*zeros(nMice, 1);
 med_nose_pos_occl = NaN*zeros(nMice, 1);
 shift_mag = [];
 for ii = 1:nMice
-    all_dists = perMouseData(ii).rew_dists_from_trail_persect(ctl_trials{ii});
+    all_dists = perMouseData(ii).rew_dists_from_trail(ctl_trials{ii});
     following_dists = [];
     for jj = 1:length(all_dists)
         trial_dists = all_dists{jj};
@@ -35,7 +35,7 @@ for ii = 1:nMice
     med_nose_pos_ctl(ii) = median(following_dists);
     
     
-    all_dists = perMouseData(ii).rew_dists_from_trail_persect(ctl2_trials{ii});
+    all_dists = perMouseData(ii).rew_dists_from_trail(ctl2_trials{ii});
     following_dists = [];
     for jj = 1:length(all_dists)
         trial_dists = all_dists{jj};
@@ -46,7 +46,7 @@ for ii = 1:nMice
     nose_pos_ctl2{ii} = following_dists;
     med_nose_pos_ctl2(ii) = median(following_dists);
     
-    all_dists = perMouseData(ii).rew_dists_from_trail_persect(occr_trials{ii});
+    all_dists = perMouseData(ii).rew_dists_from_trail(occr_trials{ii});
     following_dists = [];
     for jj = 1:length(all_dists)
         trial_dists = all_dists{jj};
@@ -57,7 +57,7 @@ for ii = 1:nMice
     nose_pos_occr{ii} = following_dists;
     med_nose_pos_occr(ii) = median(following_dists);
     
-    all_dists = perMouseData(ii).rew_dists_from_trail_persect(occl_trials{ii});
+    all_dists = perMouseData(ii).rew_dists_from_trail(occl_trials{ii});
     following_dists = [];
     for jj = 1:length(all_dists)
         trial_dists = all_dists{jj};

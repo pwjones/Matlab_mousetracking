@@ -6,25 +6,19 @@ function plotDistanceHistComparison2(dist_cell, dist_cell2, dist_thresh, plotOpt
 % specified by varargin. Plot options is a cell array for the linestyles (1,2) and the colors (3,4) of the cdf
 % traces.
 min_dist = 0; %.75;
-%defining colors
-dg = [0 .8 0]; %darker green
-dr = [.8 0 0]; %darker red
-plotColors = {[0 0 0],dr, dg, [1 0 1]};
 
-%Checking variable arguments
 if ~isempty(varargin)
     cdf_ah = varargin{1};
 else
     figure; cdf_ah = axes; hold on;
 end
-if nargin > 5 %2 or more variable args
-    plotColors = varargin{2};
-end
 if isempty(plotOptions)
    plotOptions = {'-','-','--','--'}; 
 end
-
-
+%defining colors
+dg = [0 .8 0]; %darker green
+dr = [.8 0 0]; %darker red
+plotColors = {[0 0 0],dr, dg, [1 0 1]};
 nfiles = [length(dist_cell); length(dist_cell2)];
 rew = {dist_cell, dist_cell2};
 distance_comp = cell(2,1);
@@ -42,18 +36,18 @@ for ii = 1:2
 end
     
 counts = cell(2,1); %want to do a reward/distractor, early/late comparison
-nbins = 60;
+nbins = 80;
 dx = .5;
-xbins = linspace(-dist_thresh, dist_thresh, nbins);
+%might be an easier way but it's important to get a symmetric vector around 0 for what I'm doing
+xbins = linspace(0,dist_thresh,floor(nbins/2)+1); 
+rev = -xbins(2:end); 
+xbins = [rev(end:-1:1), xbins];
 %xcenters = (dx*(0:(length(xbins)-1))) - dist_thresh + (dx/2);
 for ii=1:2
     counts{ii} = hist(distance_comp{ii}, xbins);
     [muhat(ii), sigmahat(ii)] = normfit(distance_comp{ii});
-    mu(ii) = nanmean(distance_comp{ii});
-    sigma(ii) = nanstd(distance_comp{ii});
 end
 disp(['Fitted Gaussians have means: ' num2str(muhat) '  And stds: ' num2str(sigmahat)]);
-disp(sprintf('Data distributions have Means: %s   And STDs: %s', num2str(mu), num2str(sigma)));
 % plotting things
 xl = [-dist_thresh dist_thresh];  %limits
 yl = max([counts{1,1}./sum(counts{1,1}), counts{2,1}./sum(counts{2,1})]); yl = [0 yl+(yl/5)];
@@ -62,14 +56,11 @@ figure; ah = axes; hold on;
 % Plotting PDFs 
 for ii =1:2
     xmed = double(median(distance_comp{ii}));
-    xmean = mu(ii);
-    line([xmean xmean], [0 yl(2)], 'Color',plotColors{ii}, 'LineStyle', '--'); 
-    text(xmean, yl(2), ['Mean: ' num2str(xmean)], 'Color', plotColors{ii});
-    line([xmed xmed], [0 yl(2)], 'Color',plotColors{ii}, 'LineStyle', '-'); 
-    text(xmed, yl(2), ['Median: ' num2str(xmed)], 'Color', plotColors{ii});
-    line(xbins, counts{ii}./sum(counts{ii}), 'Color', plotColors{ii}, 'LineStyle', '-', 'LineWidth', 2);
+    line([xmed xmed], [0 yl(2)], 'Color',plotColors{ii}, 'LineStyle', '--'); 
+    text(xmed, yl(2), ['median: ' num2str(xmed)], 'Color', plotColors{ii});
+    line(xbins, counts{1}./sum(counts{ii}), 'Color', plotColors{1}, 'LineStyle', '-', 'LineWidth', 2);
     gfit = normpdf(xbins, muhat(ii), sigmahat(ii));
-    line(xbins, gfit./sum(gfit), 'Linestyle', ':', 'color',plotColors{ii});
+    line(xbins, gfit./sum(gfit), 'Linestyle', '--', 'color','k');
 end
 
 % KS test the distributions
