@@ -551,7 +551,10 @@ classdef MouseTrackerKF < MouseTracker
         % ------------------------------------------------------------------------------------------------
         function showTrackingLogOverlayMovie(this, movieType, frames, varargin)
             % This function is for the online tracking that generates a log of the position of each blob.
-            if isfield(this.trackingStruct, 'binMovie')
+            if isempty(frames)
+                frames = 1:this.nFrames;
+            end
+            if isfield(this.trackingStruct, 'binMovie');
                 sub = this.trackingStruct.movieSubsample;
                 fi = int32(frames).*sub;
                 varargin{end+1} = this.trackingStruct.binMovie(:,:,fi);
@@ -1517,9 +1520,7 @@ classdef MouseTrackerKF < MouseTracker
                     closestTrailP(:,:,ii) = trailPos(mini, :);
                 end
                 over = isContained(nosePos, closestTrailP);
-                %adjClosest = findShortestVector(nosePos, closestTrailP(:,:,1:2));
-                %noseDist = sqrt(nansum((nosePos - adjClosest).^2,2));
-                %vects = adjClosest - nosePos;
+                
                 noseDist = noseDist(:,1);
                 vects = closestTrailP(:,:,1) - nosePos;
                 
@@ -1916,8 +1917,13 @@ classdef MouseTrackerKF < MouseTracker
             else
                 f = this.readMovieSection(framei, movieType);
                 f = this.plotPathsOnFrame(f, 1:2, 1);
-                %f = this.gray2rgb(f);
-                %pos = f; pos(logIm) = 255;
+                if (size(f,3) == 1)
+                    f = this.gray2rgb(f);
+                end
+                if (nargin >=5) % A little overlay, hopefully
+                    f(:,:,3) = 255 * uint8(logIm);
+                    f(:,:,1) = 255 * uint8(logIm);
+                end
                 %neg = f; neg(logIm) = 0;
                 %f = cat(3, neg, neg, pos);
                 %f(:,:,3) = max(1, f(:,:,3)+cast(logIm,'uint8')*255); %not quite sure what I'm doing here

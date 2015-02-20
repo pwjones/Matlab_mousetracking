@@ -27,8 +27,8 @@ for ii = 1:nMice
     following_dists = [];
     for jj = 1:length(all_dists)
         trial_dists = all_dists{jj};
-        %fi = find(abs(trial_dists) <= following_thresh & ~isnan(trial_dists));
-        fi = find(~isnan(trial_dists));
+        fi = find(abs(trial_dists) <= following_thresh & ~isnan(trial_dists));
+        %fi = find(~isnan(trial_dists));
         following_dists = cat(1, following_dists, trial_dists(fi));
     end
     nose_pos_ctl{ii} = following_dists;
@@ -39,8 +39,8 @@ for ii = 1:nMice
     following_dists = [];
     for jj = 1:length(all_dists)
         trial_dists = all_dists{jj};
-        %fi = find(abs(trial_dists) <= following_thresh & ~isnan(trial_dists));
-        fi = find(~isnan(trial_dists));
+        fi = find(abs(trial_dists) <= following_thresh & ~isnan(trial_dists));
+        %fi = find(~isnan(trial_dists));
         following_dists = cat(1, following_dists, trial_dists(fi));
     end
     nose_pos_ctl2{ii} = following_dists;
@@ -50,8 +50,8 @@ for ii = 1:nMice
     following_dists = [];
     for jj = 1:length(all_dists)
         trial_dists = all_dists{jj};
-        %fi = find(abs(trial_dists) <= following_thresh & ~isnan(trial_dists));
-        fi = find(~isnan(trial_dists));
+        fi = find(abs(trial_dists) <= following_thresh & ~isnan(trial_dists));
+        %fi = find(~isnan(trial_dists));
         following_dists = cat(1, following_dists, trial_dists(fi));
     end
     nose_pos_occr{ii} = following_dists;
@@ -61,8 +61,8 @@ for ii = 1:nMice
     following_dists = [];
     for jj = 1:length(all_dists)
         trial_dists = all_dists{jj};
-        %fi = find(abs(trial_dists) <= following_thresh & ~isnan(trial_dists));
-        fi = find(~isnan(trial_dists));
+        fi = find(abs(trial_dists) <= following_thresh & ~isnan(trial_dists));
+        %fi = find(~isnan(trial_dists));
         following_dists = cat(1, following_dists, trial_dists(fi));
     end
     nose_pos_occl{ii} = following_dists;

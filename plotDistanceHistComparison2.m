@@ -51,9 +51,11 @@ for ii=1:2
     [muhat(ii), sigmahat(ii)] = normfit(distance_comp{ii});
     mu(ii) = nanmean(distance_comp{ii});
     sigma(ii) = nanstd(distance_comp{ii});
+    med(ii) = nanmedian(distance_comp{ii});
 end
+fprintf('Data distributions have Medians: %s  Means: %s, STDs: %s\n', num2str(med), num2str(mu), num2str(sigma));
 disp(['Fitted Gaussians have means: ' num2str(muhat) '  And stds: ' num2str(sigmahat)]);
-disp(sprintf('Data distributions have Means: %s   And STDs: %s', num2str(mu), num2str(sigma)));
+
 % plotting things
 xl = [-dist_thresh dist_thresh];  %limits
 yl = max([counts{1,1}./sum(counts{1,1}), counts{2,1}./sum(counts{2,1})]); yl = [0 yl+(yl/5)];

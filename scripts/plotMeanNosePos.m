@@ -21,52 +21,59 @@ mean_nose_pos_ctl = NaN*zeros(nMice, 1);
 mean_nose_pos_ctl2 = NaN*zeros(nMice, 1);
 mean_nose_pos_occr = NaN*zeros(nMice, 1);
 mean_nose_pos_occl = NaN*zeros(nMice, 1);
+std_nose_pos_ctl = NaN*zeros(nMice, 1);
+std_nose_pos_ctl2 = NaN*zeros(nMice, 1);
+std_nose_pos_occr = NaN*zeros(nMice, 1);
+std_nose_pos_occl = NaN*zeros(nMice, 1);
 shift_mag = [];
 for ii = 1:nMice
     all_dists = perMouseData(ii).rew_dists_from_trail(ctl_trials{ii});
     following_dists = [];
     for jj = 1:length(all_dists)
         trial_dists = all_dists{jj};
-        %fi = find(abs(trial_dists) <= following_thresh & ~isnan(trial_dists));
-        fi = find(~isnan(trial_dists));
+        fi = find(abs(trial_dists) <= following_thresh & ~isnan(trial_dists));
+        %fi = find(~isnan(trial_dists));
         following_dists = cat(1, following_dists, trial_dists(fi));
     end
     nose_pos_ctl{ii} = following_dists;
     mean_nose_pos_ctl(ii) = mean(following_dists);
-    
+    std_nose_pos_ctl(ii) = std(following_dists);
     
     all_dists = perMouseData(ii).rew_dists_from_trail(ctl2_trials{ii});
     following_dists = [];
     for jj = 1:length(all_dists)
         trial_dists = all_dists{jj};
-        %fi = find(abs(trial_dists) <= following_thresh & ~isnan(trial_dists));
-        fi = find(~isnan(trial_dists));
+        fi = find(abs(trial_dists) <= following_thresh & ~isnan(trial_dists));
+        %fi = find(~isnan(trial_dists));
         following_dists = cat(1, following_dists, trial_dists(fi));
     end
     nose_pos_ctl2{ii} = following_dists;
     mean_nose_pos_ctl2(ii) = mean(following_dists);
+    std_nose_pos_ctl2(ii) = std(following_dists);
     
     all_dists = perMouseData(ii).rew_dists_from_trail(occr_trials{ii});
     following_dists = [];
     for jj = 1:length(all_dists)
         trial_dists = all_dists{jj};
-        %fi = find(abs(trial_dists) <= following_thresh & ~isnan(trial_dists));
-        fi = find(~isnan(trial_dists));
+        fi = find(abs(trial_dists) <= following_thresh & ~isnan(trial_dists));
+        %fi = find(~isnan(trial_dists));
         following_dists = cat(1, following_dists, trial_dists(fi));
     end
     nose_pos_occr{ii} = following_dists;
     mean_nose_pos_occr(ii) = mean(following_dists);
+    std_nose_pos_occr(ii) = std(following_dists);
     
     all_dists = perMouseData(ii).rew_dists_from_trail(occl_trials{ii});
     following_dists = [];
     for jj = 1:length(all_dists)
         trial_dists = all_dists{jj};
-        %fi = find(abs(trial_dists) <= following_thresh & ~isnan(trial_dists));
-        fi = find(~isnan(trial_dists));
+        fi = find(abs(trial_dists) <= following_thresh & ~isnan(trial_dists));
+        %fi = find(~isnan(trial_dists));
         following_dists = cat(1, following_dists, trial_dists(fi));
     end
     nose_pos_occl{ii} = following_dists;
     mean_nose_pos_occl(ii) = mean(following_dists);
+    std_nose_pos_occl(ii) = std(following_dists);
     
     % Let's do some statistical tests on the resulting distributions
     hl = 0; hr = 0; 

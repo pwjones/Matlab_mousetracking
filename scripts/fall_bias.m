@@ -33,17 +33,21 @@ for ii = 1:nMice
     figure(fh);
     ah = subplot(nRows, nRows, ii); %square, many panels
     hold on;
+    disp(mouse_names{ii});
     if(~isempty(rew_occr))
+        disp('Right Occlusion');
         plotDistanceHistComparison2(rew_free, rew_occr, following_thresh*mm_conv, '', ah, {dk, db});
         [p,h] = testCellArrayMedians(all_free, rew_occr);
-        disp(sprintf(' \nWilcoxon test for different medians (right occlusion): h = %f, p = %f\n', h, p)); 
+        fprintf(' \nWilcoxon test for different medians (right occlusion): h = %f, p = %f\n', h, p); 
     end
     if(~isempty(rew_occl))
+        disp('Left Occlusion');
         plotDistanceHistComparison2(rew_free, rew_occl, following_thresh*mm_conv, '', ah, {dk, dr});
         [p,h] = testCellArrayMedians(all_free, rew_occl);
-        disp(sprintf(' \nWilcoxon test for different medians (left occlusion): h = %f, p = %f\n', h, p)); 
+        fprintf(' \nWilcoxon test for different medians (left occlusion): h = %f, p = %f\n', h, p); 
     end
     if(~isempty(rew_free2))
+        disp('Both Unoccluded');
         plotDistanceHistComparison2(rew_free, rew_free2, following_thresh*mm_conv, '', ah, {dk, dg});
     end
     axes(ah); title(mouse_names{ii});

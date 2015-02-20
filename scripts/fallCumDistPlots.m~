@@ -137,7 +137,7 @@ for jj = 1:nMice
         subplot(nRows, nRows, jj); hold on;
         [acorr, lags] = xcorr(ts(epochi), 30, 'unbiased');
         plot(lags, acorr, 'k');
-        med_vel(jj,1) = median(abs(diff(ts(epochi))));
+        
         %plot(epochi((AR_width+2):end), cum_ts(epochi(1)+AR_width-1)+cumsum(fit{jj,1}), '--', 'Color',[.5 .5 .5]);
     end
     if ~isempty(ctl2_trials{jj})
@@ -161,12 +161,12 @@ for jj = 1:nMice
         %plot(epochi((AR_width+2):end), cum_ts(epochi(1)+AR_width-1)+cumsum(fit{jj,2}), '--', 'Color',[.5 .5 .5]);
         figure(residFigh);
         subplot(nMice, 4, 4*(jj-1)+2); hold on;
-        plot(e{jj,2}(1:end-1), e{jj,2}(2:end),'.', 'Color', [.5 .5 .5]);
+        plot(e{jj,2}(1:end-1), e{jj,2}(2:end),'b.');
         % Plot the autocorrelation function of this dataset
         figure(acorrFigh); hold on;
         [acorr, lags] = xcorr(ts(epochi), 30, 'unbiased');
         plot(lags, acorr, 'Color', [.5 .5 .5]);
-        med_vel(jj,2) = median(abs(diff(ts(epochi))));
+        
     else
         slopes(jj,2) = NaN; slope_ci(jj,2) = NaN;
     end
@@ -196,7 +196,7 @@ for jj = 1:nMice
         figure(acorrFigh); hold on;
         [acorr, lags] = xcorr(ts(epochi), 30, 'unbiased');
         plot(lags, acorr, 'b');
-        med_vel(jj,3) = median(abs(diff(ts(epochi))));
+        
     else
         slopes(jj,3) = NaN; slope_ci(jj,3) = NaN;
     end
@@ -226,7 +226,6 @@ for jj = 1:nMice
         figure(acorrFigh); hold on;
         [acorr, lags] = xcorr(ts(epochi), 30, 'unbiased');
         plot(lags, acorr, 'r');
-        med_vel(jj,4) = median(abs(diff(ts(epochi))));
     else
         slopes(jj,4) = NaN; slope_ci(jj,4) = NaN;
     end
