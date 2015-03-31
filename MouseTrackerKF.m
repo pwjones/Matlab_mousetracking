@@ -8,7 +8,6 @@ classdef MouseTrackerKF < MouseTracker
         fullPaths; %the full detected paths, to be saved if the paths are skeletonized
         exploredProp; %the proportions of the trails explored at each timepoint
         exploredLen; %the lengths of the trails explored at each timepoint (in px)
-        trackingStruct; %structure used to save external tracking info
         trailShadow = [];
         trailShadow_size = 20;
         pathVerticesDefined = 0;
@@ -548,22 +547,6 @@ classdef MouseTrackerKF < MouseTracker
             set(fh, 'WindowKeyPressFcn', '');
         end
         
-        % ------------------------------------------------------------------------------------------------
-        function showTrackingLogOverlayMovie(this, movieType, frames, varargin)
-            % This function is for the online tracking that generates a log of the position of each blob.
-            if isempty(frames)
-                frames = 1:this.nFrames;
-            end
-            if isfield(this.trackingStruct, 'binMovie');
-                sub = this.trackingStruct.movieSubsample;
-                fi = int32(frames).*sub;
-                varargin{end+1} = this.trackingStruct.binMovie(:,:,fi);
-                showMovie(this, movieType, frames, varargin{:});
-            else
-                disp('You must call readTrackingLog first');
-            end
-        end
-        
         % -------------------------------------------------------------------------------------------------
         function exitMovieLoop(this, src, event)
             % Function to set a flag internally to exit a movie that is being displayed.
@@ -636,9 +619,14 @@ classdef MouseTrackerKF < MouseTracker
                     last = (jj)*this.framesPerSeg;
                 end
                 segFrames = frames(first:last);
-                
                 disp(['Finding mouse in segment ' num2str(jj)]);
-                [frameArray, fcLum] = this.readMovieSection(segFrames,'bin', this.default_thresh);
+                
+                if ~this.logFile
+                    [frameArray, fcLum] = this.readMovieSection(segFrames,'bin', this.default_thresh);
+                else
+                    frameArray = this.makeMovieFromLog(segFrames); 
+                    fcLum = zeros(length(segFrames),1);
+                end
                 segFrames = segFrames(1:size(frameArray, 3)); % look at the return to verify it returned the correct size array
                 this.fcLum(segFrames) = fcLum; % save the frame counter area value
                 newFrameCount(jj) = this.nFrames;
@@ -2189,45 +2177,6 @@ classdef MouseTrackerKF < MouseTracker
             end
         end
         
-    % -------------------- Functions dealing with the log file (may not exist) -------------------------------
-    
-        % -------------------------------------------------
-        function readTrackingLog(this, varargin)
-        % function readTrackingLog(varargin)
-        % 
-        % This reads in a log file detailing the tracked segments from another program.  
-        % 
-            % parse input, generate default
-            if nargin >= 2
-                filestr = varargin{1}; % first arg is 'this'
-            else
-                [path, fn, ext] = fileparts(this.videoFN);
-                [basename, rem] = strtok(fn, '_');
-                expr = [basename, '_(.*)-0000'];
-                [matchstart,matchend,tokenindices,matchstring,tokenstring,tokenname,splitstring]= regexp(fn,expr);
-                timestr = tokenstring{1}; 
-                timestr = timestr{1}; %f'ing stupid cell nesting
-                filestr = [path filesep 'trackingLog_' timestr '.txt'];
-            end
-            if ~exist(filestr, 'file')
-                disp('Cannot find the specified log file');
-                return;
-            end
-            trackingStruct = readCCVLog(filestr);
-            this.trackingStruct = trackingStruct;
-        end
-        
-        function drawTrackedAreas(this, framei, ah)
-            %function drawTrackedAreas(framei)
-            if isempty(ah)
-                ah = gca;
-            end
-            for i=1:this.trackingStruct.frameInfo(framei).nAreas
-                area = this.trackingStruct.frameInfo(framei).areas(i);
-                hold on;
-                plot(ah, area.PixelList(:,1), area.PixelList(:,2), '.-r', 'LineWidth', 2);
-            end
-        end
 
     end %Methods
     

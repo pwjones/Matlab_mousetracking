@@ -4,7 +4,7 @@
 fallCohortList; % this script contains the mouse and file names to be included in the analysis.
 %spring14CohortList;
 base_folder = VIDEO_ROOT;
-following_thresh = 20; %px
+following_thresh = 40; %px
 mm_conv = .862; %mm/px
 skeletonize_paths = 1;
 clear perMouseData;

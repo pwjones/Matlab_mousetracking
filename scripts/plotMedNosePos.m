@@ -15,7 +15,7 @@ mm_conv = .862; %mm/px conversion
 % ctl2_trials = {[], [], [], [], [], []};
 % nMice = length(perMouseData);
 
-fh = figure; hold on;
+fh = figure; ah = axes; hold on;
 % want to compile the median nose distance from trail while following
 med_nose_pos_ctl = NaN*zeros(nMice, 1);
 med_nose_pos_ctl2 = NaN*zeros(nMice, 1);
@@ -99,14 +99,15 @@ for ii = 1:nMice
     % now let's plot the medians with fill indicating significance
     y = [med_nose_pos_occl(ii), med_nose_pos_ctl(ii), med_nose_pos_ctl2(ii), med_nose_pos_occr(ii)]; 
     x = [1, 2.25, 2.75, 4];
-    plot(x, y, 'o-k', 'MarkerSize', 10);
-    % Replot the filled markers over if they are significant
-    if hl
-        plot(1,y(1), 'ok', 'MarkerSize', 10, 'MarkerFaceColor', 'k');
-    end
-    if hr
-        plot(4,y(4), 'ok', 'MarkerSize', 10, 'MarkerFaceColor', 'k');
-    end
+    plotConnectedCategoricalPoints(ah,x,y,[hl 0 0 hr]);
+%     plot(x, y, 'o-k', 'MarkerSize', 10);
+%     % Replot the filled markers over if they are significant
+%     if hl
+%         plot(1,y(1), 'ok', 'MarkerSize', 10, 'MarkerFaceColor', 'k');
+%     end
+%     if hr
+%         plot(4,y(4), 'ok', 'MarkerSize', 10, 'MarkerFaceColor', 'k');
+%     end
 end
 
 % Make some asthetic changes to the plot

@@ -29,15 +29,16 @@ mm_conv = .862;
 mm_conv = .862; %mm per px
 nMice = length(perMouseData);
 nRows = ceil(sqrt(nMice));
-fh = figure;
-ah = axes;   hold on;
-anal_trials = [40:70];
+fh = figure; 
+sah = axes; hold on;
+anal_trials = [5:20];
 params = NaN*zeros(nMice, 2);
 for ii = 1:nMice
-    rew_free = perMouseData(ii).rew_dists_from_trail(anal_trials);
- 
+    %sah = subplot(nRows, nRows, ii); hold on;
+    rew_free = perMouseData(ii).rew_dists_from_trail(ctl_trials{ii});
+    %rew_free = perMouseData(ii).rew_dists_from_trail(anal_trials);
     if(~isempty(rew_free))
-        params(ii,:) = plotDistFromTrailDistribution(rew_free, thresh_dist, '', ah);
+        params(ii,:) = plotDistFromTrailDistribution(rew_free, thresh_dist, '', sah);
         
     end
 end

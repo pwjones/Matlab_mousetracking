@@ -47,7 +47,7 @@ end
 function binMovie = makeMovieFromAreas(frames)
     width = 1280;
     height = 1024;
-    MAX_FRAMES = 5000;
+    MAX_FRAMES = 500;
     nFrames = min(MAX_FRAMES, length(frames));
     binMovie = false(height, width, nFrames);
     for i = 1:nFrames

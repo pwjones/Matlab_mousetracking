@@ -34,7 +34,7 @@ for jj=1:trials
     all_dists = cat(1, all_dists, dists(:));
 end
     
-nbins = 10*dist_thresh;
+nbins = 4*dist_thresh;
 mlePDF = @cauchyPDF2;
 mleCDF = @cauchyCDF2;
 
@@ -48,6 +48,9 @@ count_dist = counts./nansum(counts);
 % use mle rather than lsqcurvefit for fitting a distribution - it's supposedly the right 
 mle_fit_params = mle(all_dists, 'pdf', mlePDF, 'start', double(x0), 'cdf', mleCDF);
 [f, xcdf] = plotEmpiricalCDF({all_dists}, .2, plotColors(ii), plotOptions(ii), cdf_ah);
+lower25 = find(f <= .25, 1, 'last'); upper25 = find(f>=.75, 1, 'first');
+meanPos = nanmean(all_dists)
+FWHH = xcdf(upper25) - xcdf(lower25)
 gfit = mleCDF(xbins, mle_fit_params(1), mle_fit_params(2));
 line('parent', cdf_ah,'xdata',xbins, 'ydata', gfit, 'Linestyle', '--', 'color','r');
 disp(sprintf('Full Mean: %.3f   SD: %.3f', nanmean(all_dists), nanstd(all_dists)));
@@ -65,9 +68,9 @@ figure; ah = axes; hold on;
 for ii =1:1
     % The PDF 
     line(xbins, count_dist, 'Color', plotColors{ii}, 'LineStyle', '-', 'LineWidth', 2);
-    xmed = double(median(all_dists)); 
-    line([xmed xmed], [0 yl(2)], 'Color',plotColors{ii}, 'LineStyle', '--'); 
-    text(xmed, yl(2), ['median: ' num2str(xmed)], 'Color', plotColors{ii});
+    xmean = double(mean(all_dists)); 
+    line([xmean xmean], [0 yl(2)], 'Color',plotColors{ii}, 'LineStyle', '--'); 
+    text(xmean, yl(2), ['mean: ' num2str(xmean)], 'Color', plotColors{ii});
     % The fitted function
     gfit = mlePDF(xbins, mle_fit_params(1), mle_fit_params(2));
     line(xbins, gfit./sum(gfit), 'Linestyle', '--', 'color','r');

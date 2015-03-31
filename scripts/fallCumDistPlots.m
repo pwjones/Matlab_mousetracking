@@ -15,17 +15,21 @@ distThresh = 20;
 mm_conv = .862; %mm/px conversion
 distThresh = distThresh*mm_conv;
 segLenThresh = 40; % n samples in a row minimum for this analysis
-AR_width = 4;
-armean = @(fitp) fitp(1) ./ (1-sum(fitp(2:end))); %mean of the AR model
-anonARmean = @(data) armean(fitARmodel(data, AR_width));
-nboot = 200; %number of bootstrap resamples
-segL = 100; %resampling segment length for bootstrapping
-segSep = 100;
+corrWidth = 40;
+AR_width = 3;
+MA_width = 4;
+nboot = 500; %number of bootstrap resamples
+segL = 40; %resampling segment length for bootstrapping
+segSep = 50;
+% anonymous functions used to bootstrap the means of the fitted AR models
+armean = @(fitp) fitp(1) ./ (1-sum(fitp(2:end))); %mean of the AR model from fitted parameters
+anonARmean = @(data) armean(fitARmodel(data, AR_width)); % returns the mean rather than all params, can call in loop easily
 
 
 % Initialize some vars
 fitp = cell(nMice, 4); fitp_ci = cell(nMice, 4); %parameters of model fit
-armean = cell(nMice, 4); armean_ci = cell(nMice, 4); %parameters of model fit
+armean = NaN*zeros(nMice, 4); armean_ci = NaN*zeros(nMice, 4, 2); %parameters of model fit
+dwstat = NaN*zeros(nMice,4);
 ar_means = NaN*zeros(nMice,4);
 e = cell(nMice, 4); fit = cell(nMice, 4);
 med_vel = NaN*zeros(nMice, 4); %median velocities - want to check these
@@ -33,6 +37,7 @@ acorrFigh = figure;
 segLenFigh = figure;
 residFigh = figure;
 cumfigh = figure;
+
 
 for jj = 1:nMice
     figure(cumfigh);
@@ -89,7 +94,7 @@ for jj = 1:nMice
     min_ts = min(cum_ts); max_ts = max(cum_ts); pad = 1000;
     ylim([min_ts - pad,  max_ts+pad]);
     plot(cum_ts, 'LineWidth', 1, 'Color', 'k');
-    set(gca, 'Ydir', 'reverse');
+    set(gca, 'Ydir', 'reverse', 'TickDir', 'out');
     ylabel('Cumulative Distance From Trail (mm)');
     xlabel('Behavioral Time (frames)');
     
@@ -119,11 +124,14 @@ for jj = 1:nMice
         slopes(jj,1) = p(1); slope_ci(jj,1) = ci(1);
         
         % fitting autoregressive (AR with mean) model to timeseries
-        [fitp{jj,1}, fitp_ci{jj,1}, e{jj,1}, fit{jj,1}] = fitARmodel(ts(epochi), AR_width);
+        [fitp{jj,1}, fitp_ci{jj,1}, e{jj,1}, fit{jj,1}, dwstat(jj,1)] = fitARmodel(ts(epochi), AR_width);
+        
+        %[fitp{jj,1}, fitp_ci{jj,1}, e{jj,1}, fit{jj,1}] = fitARMAmodel(ts(epochi), AR_width, MA_width);
         param_sum = sum(fitp{jj,1}(2:end));  fprintf('Unit root of fit is %f\n', param_sum);
         ar_means(jj,1) =  fitp{jj,1}(1) ./ (1-sum(fitp{jj,1}(2:end))); %mean of the AR model
         % putting confidence intervals on the mean using moving block bootstrapping
-        [armean{jj,1}, armean_ci{jj,1}] = mbBootstrap(nboot, anonARmean, ts(epochi), segL, segSep);
+        %[armean(jj,1), armean_ci(jj,1,:)] = mbBootstrap(nboot, anonARmean, ts(epochi), segL, segSep);
+        [armean(jj,1), armean_ci(jj,1,:)] = mbBootstrap(nboot, @fitCumTsSlope, ts(epochi), segL, segSep);
         epochy = cum_ts(epochi);
         predy =  ((1:length(epochy)) * ar_means(jj,1))'; 
         p = polyfit(fitx, epochy-predy, 0);
@@ -135,7 +143,7 @@ for jj = 1:nMice
         % Plot the autocorrelation function of this dataset
         figure(acorrFigh);
         subplot(nRows, nRows, jj); hold on;
-        [acorr, lags] = xcorr(ts(epochi), 30, 'unbiased');
+        [acorr, lags] = xcorr(ts(epochi), corrWidth, 'unbiased');
         plot(lags, acorr, 'k');
         med_vel(jj,1) = median(abs(diff(ts(epochi))));
         %plot(epochi((AR_width+2):end), cum_ts(epochi(1)+AR_width-1)+cumsum(fit{jj,1}), '--', 'Color',[.5 .5 .5]);
@@ -149,10 +157,11 @@ for jj = 1:nMice
         slopes(jj,2) = p(1); slope_ci(jj,2) = ci(1);
         
         % fitting autoregressive (AR with mean) model to timeseries
-        [fitp{jj,2}, fitp_ci{jj,2}, e{jj,2}, fit{jj,2}] = fitARmodel(ts(epochi), AR_width);
+        [fitp{jj,2}, fitp_ci{jj,2}, e{jj,2}, fit{jj,2}, dwstat(jj,2)] = fitARmodel(ts(epochi), AR_width);
         param_sum = sum(fitp{jj,2}(2:end));  fprintf('Unit root of fit is %f\n', param_sum);
         ar_means(jj,2) =  fitp{jj,2}(1) ./ (1-sum(fitp{jj,2}(2:end))); %mean of the AR model
-        [armean{jj,2}, armean_ci{jj,2}] = mbBootstrap(nboot, anonARmean, ts(epochi), segL, segSep);
+        %[armean(jj,2), armean_ci(jj,2,:)] = mbBootstrap(nboot, anonARmean, ts(epochi), segL, segSep);
+        [armean(jj,2), armean_ci(jj,2,:)] = mbBootstrap(nboot, @fitCumTsSlope, ts(epochi), segL, segSep);
         epochy = cum_ts(epochi);
         predy =  ((1:length(epochy)) * ar_means(jj,2))'; 
         p = polyfit(fitx, epochy-predy, 0);
@@ -164,7 +173,7 @@ for jj = 1:nMice
         plot(e{jj,2}(1:end-1), e{jj,2}(2:end),'.', 'Color', [.5 .5 .5]);
         % Plot the autocorrelation function of this dataset
         figure(acorrFigh); hold on;
-        [acorr, lags] = xcorr(ts(epochi), 30, 'unbiased');
+        [acorr, lags] = xcorr(ts(epochi), corrWidth, 'unbiased');
         plot(lags, acorr, 'Color', [.5 .5 .5]);
         med_vel(jj,2) = median(abs(diff(ts(epochi))));
     else
@@ -179,10 +188,11 @@ for jj = 1:nMice
         slopes(jj,3) = p(1); slope_ci(jj,3) = ci(1);
         
         % fitting autoregressive (AR with mean) model to timeseries
-        [fitp{jj,3}, fitp_ci{jj,3}, e{jj,3}, fit{jj,3}] = fitARmodel(ts(epochi), AR_width);
+        [fitp{jj,3}, fitp_ci{jj,3}, e{jj,3}, fit{jj,3}, dwstat(jj,3)] = fitARmodel(ts(epochi), AR_width);
         param_sum = sum(fitp{jj,3}(2:end));  fprintf('Unit root of fit is %f\n', param_sum);
         ar_means(jj,3) =  fitp{jj,3}(1) ./ (1-sum(fitp{jj,3}(2:end))); %mean of the AR model
-        [armean{jj,3}, armean_ci{jj,3}] = mbBootstrap(nboot, anonARmean, ts(epochi), segL, segSep);
+        %[armean(jj,3), armean_ci(jj,3,:)] = mbBootstrap(nboot, anonARmean, ts(epochi), segL, segSep);
+        [armean(jj,3), armean_ci(jj,3,:)] = mbBootstrap(nboot, @fitCumTsSlope, ts(epochi), segL, segSep);
         epochy = cum_ts(epochi);
         predy =  ((1:length(epochy)) * ar_means(jj,3))'; 
         p = polyfit(fitx, epochy-predy, 0);
@@ -194,7 +204,7 @@ for jj = 1:nMice
         plot(e{jj,3}(1:end-1), e{jj,3}(2:end),'b.');
         % Plot the autocorrelation function of this dataset
         figure(acorrFigh); hold on;
-        [acorr, lags] = xcorr(ts(epochi), 30, 'unbiased');
+        [acorr, lags] = xcorr(ts(epochi), corrWidth, 'unbiased');
         plot(lags, acorr, 'b');
         med_vel(jj,3) = median(abs(diff(ts(epochi))));
     else
@@ -209,10 +219,11 @@ for jj = 1:nMice
         slopes(jj,4) = p(1); slope_ci(jj,4) = ci(1);
         
          % fitting autoregressive (AR with mean) model to timeseries
-        [fitp{jj,4}, fitp_ci{jj,4}, e{jj,4}, fit{jj,4}] = fitARmodel(ts(epochi), AR_width);
+        [fitp{jj,4}, fitp_ci{jj,4}, e{jj,4}, fit{jj,4}, dwstat(jj,4)] = fitARmodel(ts(epochi), AR_width);
         param_sum = sum(fitp{jj,4}(2:end));  fprintf('Unit root of fit is %f\n', param_sum);
         ar_means(jj,4) =  fitp{jj,4}(1) ./ (1-sum(fitp{jj,4}(2:end))); %mean of the AR model
-        [armean{jj,4}, armean_ci{jj,4}] = mbBootstrap(nboot, anonARmean, ts(epochi), segL, segSep);
+        %[armean(jj,4), armean_ci(jj,4,:)] = mbBootstrap(nboot, anonARmean, ts(epochi), segL, segSep);
+        [armean(jj,4), armean_ci(jj,4,:)] = mbBootstrap(nboot, @fitCumTsSlope, ts(epochi), segL, segSep);
         epochy = cum_ts(epochi);
         predy =  ((1:length(epochy)) * ar_means(jj,4))'; 
         p = polyfit(fitx, epochy-predy, 0);
@@ -224,7 +235,7 @@ for jj = 1:nMice
         plot(e{jj,4}(1:end-1), e{jj,4}(2:end),'r.');
         % Plot the autocorrelation function of this dataset
         figure(acorrFigh); hold on;
-        [acorr, lags] = xcorr(ts(epochi), 30, 'unbiased');
+        [acorr, lags] = xcorr(ts(epochi), corrWidth, 'unbiased');
         plot(lags, acorr, 'r');
         med_vel(jj,4) = median(abs(diff(ts(epochi))));
     else
@@ -250,3 +261,28 @@ for ii = 1:numel(fitp)
         ar_means(ii) = ar_slopes(ii) ./ (1-sum(temp(2:end)));
     end
 end
+ar_means_p = ar_means(:,[4 1 2 3]);
+armean_ci_p = armean_ci(:,[4 1 2 3],:);
+armean_p = armean(:,[4 1 2 3]);
+
+%% Plots the fitted biases across conditions
+
+%Simple significance
+sig = zeros(size(armean));
+for ii = 1:size(armean,1)
+    if (armean_ci_p(ii,1,2) < armean_ci_p(ii,2,1))
+        sig(ii,1) = 1;
+    end
+    if (armean_ci_p(ii,4,1) > armean_ci_p(ii,2,2))
+        sig(ii,4) = 1;
+    end
+end
+figure; ah = axes; hold on;
+x = [1, 2.25, 2.75, 4];
+x = repmat(x, size(ar_means,1), 1);
+plotConnectedCategoricalPoints(ah, x', armean_p', sig');
+addErrorBarsAsym(ah, x', armean_p', armean_ci_p(:,:,1)', armean_ci_p(:,:,2)', 'k', .1); 
+
+
+
+

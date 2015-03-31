@@ -52,6 +52,11 @@ classdef MouseTracker < handle
         % Want to assign an ID to each identified area
         blob_num = 1;
         blobID = [];
+        % CCV does online tracking and writes a log of tracked areas that need to be stored and integrated into 
+        % the data structures in order to analyze those paths in the same way as native tracked data. 
+        logFile = 0; % Accompanying log file for the video exists
+        logFN = ''; % Its name
+        logStruct; % structure used to save external tracking info
     end
     properties (SetAccess = private)
         
@@ -70,6 +75,9 @@ classdef MouseTracker < handle
             % presented.
             % 2 - frame range - a vector of frame numbers to consider as the whole movie, example 1:100
             % 3 - time range - a beginning and end time to consider as the whole movie, in sec, example [60 120].
+            % 4 - crop
+            % 5 - filename of tracked data log file that corresponds to the
+            % movie
             
             % This is all to just make sure that the file is opened correctly, and that it will take a filename,
             % directory or nothing.
@@ -99,6 +107,12 @@ classdef MouseTracker < handle
             else
                 this.videoFN = filename;
             end
+            
+            if (nargin > 4) % there is a log file given
+                this.logFile = 1;
+                this.logFN = varargin{5};
+            end
+            
             [base_dir, base_fn, ext] =  fileparts(this.videoFN);
             mat_fn = fullfile(base_dir, [base_fn '.mat']);
             if exist(mat_fn, 'file')
@@ -125,17 +139,20 @@ classdef MouseTracker < handle
                 end
                 this.videoFN = arg_vidFN; %for some reason, in no case does the full video filename gets saved
             elseif loadVideo %initialize normally 
+                if this.logFile == 1
+                    this.readTrackingLog();
+                end
                 % Read just a couple of frames to get an idea of video speeds, etc.
                 this.readerObj = VideoReader(this.videoFN);
-                
-                %vid_struct = mmread(this.videoFN, 1); 
-                %vid_struct = vid_struct(1); %sometimes returning as array.  Weird.
                 this.frameRate = this.readerObj.FrameRate;
                 this.nativeWidth = this.readerObj.Width;
                 this.nativeHeight = this.readerObj.Height;
                 this.fcPeriod = round(this.frameRate);
                 if (nargin > 3) %there is a crop vector present
                     this.crop = varargin{4};
+                    if isempty(this.crop)
+                        this.crop = [0 0 0 0];
+                    end
                     this.width = this.readerObj.width - sum(this.crop(1:2));
                     this.height = this.readerObj.height - sum(this.crop(3:4));
                 else
@@ -153,19 +170,25 @@ classdef MouseTracker < handle
                     if (fr(2) > this.readerObj.NumberOfFrames)
                         fr(2) = this.readerObj.NumberOfFrames;
                     end
-                    this.frameRange = fr(1):fr(2);
-                elseif nargin == 2
-                    this.frameRange = varargin{2};
+                    if nargin > 1
+                        spec_fr = varargin{2};
+                    else 
+                        spec_fr = [];
+                    end
+                    if isempty(spec_fr)
+                        this.frameRange = fr(1):fr(2);
+                    else
+                        this.frameRange = spec_fr;
+                    end
+                    
                 end
                 if isempty(this.frameRange) % then specify the whole video's range
                     this.frameRange = 1:this.readerObj.NumberOfFrames; %undershoot to avoid potential problems
                     this.trustFrameCount = 1;
                 end
+                
                 % read in enough frames to create the average frame
-                %avgRange = this.frameRange(1):this.avgSubsample:this.frameRange(end);
                 disp('MouseTracker: reading movie to make average frame');
-                %vid_struct = mmread(this.videoFN, avgRange);     
-                %vid_struct = this.convertToGray(vid_struct);
                 avgRange = 1:this.avgSubsample:length(this.frameRange);
                 while (length(avgRange) < 20)
                     this.avgSubsample = floor(this.avgSubsample/2);
@@ -173,14 +196,23 @@ classdef MouseTracker < handle
                 end
                 vidArray = this.readFrames(this.listToIntervals(avgRange), 'discontinuous');
                 this.avgFrame = uint8(mean(vidArray, 3));
-                %this.avgFrame = mean(vidArray,3);
-                %this.averageFrame(vidArray, 1:length(vid_struct.frames));
 
                 % Populate the fields with empty data
                 this.nFrames = length(this.frameRange);
                 this.times = ((1:this.nFrames)-1)/this.frameRate; % time vector starts at 0
-                %this.times = ((this.frameRange(1):this.frameRange(2))-1)/this.frameRate + t_offset;
-                %initialize areas
+                
+                if this.logFile == 1
+                    this.alignTrackingLog();
+                    this.nFrames = length(this.logStruct.frameInfo);
+                    this.frameRange = 1:this.nFrames;
+                    this.frameRate = this.logStruct.movieSubsample*this.frameRate;
+                    this.times = zeros(this.nFrames, 1);
+                    for ii = 1:this.nFrames
+                        this.times(ii) = this.logStruct.frameInfo(ii).t - this.logStruct.frameInfo(1).t;
+                    end
+                    this.frameRate = 1/(nanmean(diff(this.times))/1000);
+                end
+                %initialize tracked areas
                 this.clearCalcData();
             else
                 this.nFrames = 0;
@@ -509,13 +541,16 @@ classdef MouseTracker < handle
             close(vidWriter);
         end
         
-        % ------------------------------------------------------------------------------------------------------
+        % -------------------------------------------------------------------------------------------------
         function showMovie(this, movieType, frames, varargin)
-            % function showMovie(this, useBinMovie, frameRange)
-            if length(varargin) >=1
+            % function showMovie(this, useBinMovie, frames, dispCrop[OPTIONAL], overlay[OPTIONAL])
+            if nargin >=4
                 dispCrop = varargin{1};
             else
                 dispCrop = [];
+            end
+            if nargin >=5
+                overlayMov = varargin{2};
             end
             fh = figure;
             this.exitMovie = 0;
@@ -528,7 +563,11 @@ classdef MouseTracker < handle
                 if this.exitMovie
                     break
                 end
-                this.showFrame(fi, movieType, dispCrop);
+                if nargin < 5
+                    this.showFrame(fi, movieType, dispCrop);
+                else
+                    this.showFrame(fi, movieType, dispCrop, overlayMov(:,:,ii));
+                end
                 hold off;
                 pause(1/this.frameRate/1); %faster than the natural framerate due to impatience.
             end
@@ -621,9 +660,12 @@ classdef MouseTracker < handle
                     last = (jj)*this.framesPerSeg;
                 end
                 segFrames = frames(first:last);
-                
                 disp(['Finding mouse in segment ' num2str(jj)]);
-                frameArray = this.readMovieSection(segFrames,'bin');
+                if ~this.logFile
+                    frameArray = this.readMovieSection(segFrames,'bin');
+                else
+                    frameArray = this.makeMovieFromLog(segFrames);
+                end
                 segFrames = segFrames(1:size(frameArray, 3));
                 newFrameCount(jj) = this.nFrames;
                 trimmed(jj) = 0; 
@@ -1540,11 +1582,16 @@ classdef MouseTracker < handle
             turning_total = nansum(turning_vect);
         end
         % ------------------------------------------------------------------------------------------------------
-        function showFrame(this, framei, movieType, dispCrop)
+        function showFrame(this, framei, movieType, dispCrop, varargin)
             % function showFrame(this, framei, useBinMovie)
             %
             % plots a frame of the movie,
             if isempty(dispCrop) dispCrop = [1 1 this.width this.height]; end
+            if (nargin >= 5)
+                logIm = varargin{1};
+            else
+                logIm = false(this.height, this.width);
+            end
             dbg = 0;
             if strcmp(movieType, 'bin')
                 bf = zeros(this.height, this.width, 'uint8');
@@ -1561,16 +1608,26 @@ classdef MouseTracker < handle
                     end
                 end
                 pathIm = this.plotPaths()*4;
-                bf = bf+pathIm;
-                imshow(label2rgb(bf, 'cool','k')); hold on;
-                %imshow(bf, [0 0 0; 1 1 1; 1 0 0; 0 0 1; 1 1 1; 1 0 0]); hold on;  
+                bf = bf+pathIm + uint8(logIm)*3;
+                imshow(label2rgb(bf, 'cool','k')); hold on;  
+                %f = label2rgb(bf, 'cool','k');
+                %pos = max(f,3); pos(logIm) = 255;
+                %neg = max(f,3); f; neg(logIm) = 0;
             else
-                %f = mmread(this.videoFN, this.frameRange(framei));
-                %f = this.readFrames(framei);
-                %imshow(f.frames.cdata); 
                 f = this.readMovieSection(framei, movieType);
+                f = this.plotPathsOnFrame(f, 1:2, 1);
+                if (size(f,3) == 1)
+                    f = this.gray2rgb(f);
+                end
+                if (nargin >=5) % A little overlay, hopefully
+                    f(:,:,3) = 255 * uint8(logIm);
+                    f(:,:,1) = 255 * uint8(logIm);
+                end
+                %neg = f; neg(logIm) = 0;
+                %f = cat(3, neg, neg, pos);
+                %f(:,:,3) = max(1, f(:,:,3)+cast(logIm,'uint8')*255); %not quite sure what I'm doing here
+                %f(:,:,1) = 
                 imshow(f);
-                %imshow(imabsdiff(f.frames.cdata, this.avgFrame));
                 hold on;
             end
             %annotate the image
@@ -1580,6 +1637,7 @@ classdef MouseTracker < handle
                     plot(this.COM(framei,1,jj), this.COM(framei,2,jj), 'r+', 'MarkerSize', 12, 'LineWidth',1);
                     ellipse(this.areas(framei,jj).MajorAxisLength/2, this.areas(framei,jj).MinorAxisLength/2, ...
                             this.orient(framei,jj), this.COM(framei,1,jj),this.COM(framei,2,jj),'r');
+                    %text(this.COM(framei,1,jj)+10, this.COM(framei,2,jj), num2str(this.blobID(framei, jj)), 'Color','r', 'FontSize', 14);
                 end
                 line(this.bodyCOM(framei,1), this.bodyCOM(framei,2), 'Marker', 'o', 'Color', 'c','MarkerSize', 12, 'LineWidth',2);
                     %line(this.areas(framei).Extrema(:,1), this.areas(framei).Extrema(:,2), 'Marker', '.', 'Color', 'c');
@@ -1587,13 +1645,13 @@ classdef MouseTracker < handle
                     %quiver(this.COM(framei,1), this.COM(framei,2), u,v, 'LineWidth', 2); %plots an orientation arrow
                 if this.tailVisible(framei)
                     line(this.areas(framei,this.tailblob(framei)).Centroid(1), this.areas(framei,this.tailblob(framei)).Centroid(2), ...
-                        'Marker', 'x', 'Color', 'c','MarkerSize', 12, 'LineWidth',2);
+                        'Marker', 'x', 'Color', 'm','MarkerSize', 12, 'LineWidth',2);
                 end
                 if (~isnan(this.noseblob(framei)))
                     line(this.areas(framei,this.noseblob(framei)).Centroid(1), this.areas(framei,this.noseblob(framei)).Centroid(2), ...
-                        'Marker', '+', 'Color', 'g','MarkerSize', 12, 'LineWidth',2);
-                    [xv,yv] = pol2cart(this.orient(framei), this.vel(framei));
-                    quiver(this.areas(framei, this.noseblob(framei)).Centroid(1), this.areas(framei,this.noseblob(framei)).Centroid(2), xv, yv, 0);
+                        'Marker', '+', 'Color', 'g','MarkerSize', 8, 'LineWidth',2);
+%                    [xv,yv] = pol2cart(this.orient(framei), this.vel(framei));
+%                    quiver(this.areas(framei, this.noseblob(framei)).Centroid(1), this.areas(framei,this.noseblob(framei)).Centroid(2), xv, yv, 0);
                 end
             end
            set(gca, 'xlim', [dispCrop(1) dispCrop(3)], 'ylim', [dispCrop(2) dispCrop(4)]);
@@ -1678,6 +1736,110 @@ classdef MouseTracker < handle
             fakePath.PixelList = PixelList;
         end
 
+        % -------------------- Functions dealing with the log file (may not exist) -------------------------------
+    
+        % ----------------------------------------------------------------
+        function readTrackingLog(this, varargin)
+        % function readTrackingLog(varargin)
+        % 
+        % This reads in a log file detailing the tracked segments from another program.  
+        % 
+            % parse input, generate default
+            if nargin >= 2
+                filestr = varargin{1}; % first arg is 'this'
+            else
+                [path, fn, ext] = fileparts(this.videoFN);
+                [basename, rem] = strtok(fn, '_');
+                expr = [basename, '_(.*)-0000'];
+                [matchstart,matchend,tokenindices,matchstring,tokenstring,tokenname,splitstring]= regexp(fn,expr);
+                timestr = tokenstring{1}; 
+                timestr = timestr{1}; %f'ing stupid cell nesting
+                filestr = [path filesep basename '_trackingLog_' timestr '.txt'];
+            end
+            if ~exist(filestr, 'file')
+                disp('Cannot find the specified log file');
+                return;
+            end
+            logStruct = readCCVLog(filestr);
+            this.logStruct = logStruct;
+            % Copy the path structure
+            if (logStruct.nSkelPaths > 0)
+                this.paths = logStruct.skelPaths;
+                this.fullPaths = logStruct.paths;
+                w = size(logStruct.binMovie,2); h = size(logStruct.binMovie,1);
+                for ii = 1:logStruct.nSkelPaths
+                    this.paths(ii).PixelIdxList = sub2ind([h,w], this.paths(ii).PixelList(:,2), this.paths(ii).PixelList(:,1));
+                    this.fullPaths(ii).PixelIdxList = sub2ind([h,w], this.fullPaths(ii).PixelList(:,2), this.fullPaths(ii).PixelList(:,1));
+                end
+            elseif (logStruct.nPaths > 0)
+                this.paths = logStruct.paths;
+                w = size(logStruct.binMovie,2); h = size(logStruct.binMovie,1);
+                for ii = 1:logStruct.paths
+                    this.paths(ii).PixelIdxList = sub2ind([h,w], this.paths(ii).PixelList(:,2), this.paths(ii).PixelList(:,1));
+                end
+            end
+        end
+        
+        % ---------------------------------------------------------------
+        function alignTrackingLog(this)
+        % Now we have to trim it based on what limits were specified
+        % when the movie was loaded.  
+            startFrame = this.frameRange(1)*this.logStruct.movieSubsample;
+            endFrame = ( (this.frameRange(end)-this.frameRange(1)) *this.logStruct.movieSubsample )+startFrame;
+            this.logStruct.frameInfo = this.logStruct.frameInfo(startFrame:endFrame);
+            nBinFrames = size(this.logStruct.binMovie,3);
+            this.logStruct.binMovie = this.logStruct.binMovie(:,:, startFrame:min(nBinFrames, endFrame));
+        end
+        
+        % ----------------------------------------------------------------
+        function drawTrackedAreas(this, framei, ah)
+            %function drawTrackedAreas(framei)
+            if isempty(ah)
+                ah = gca;
+            end
+            for i=1:this.logStruct.frameInfo(framei).nAreas
+                area = this.logStruct.frameInfo(framei).areas(i);
+                hold on;
+                plot(ah, area.PixelList(:,1), area.PixelList(:,2), '.-r', 'LineWidth', 2);
+            end
+        end
+        
+        % ------------------------------------------------------------------------------------------------
+        function showTrackingLogOverlayMovie(this, movieType, frames, varargin)
+            % This function is for the online tracking that generates a log
+            % of the position of each blob. 
+            % Vargin: 1) Display crop - as in constructor
+            if isempty(frames)
+                frames = 1:this.nFrames;
+            end
+            if isfield(this.logStruct, 'binMovie');
+                sub = this.logStruct.movieSubsample;
+                fi = ((int32(frames)-1).*sub)+1;
+                varargin{end+1} = this.logStruct.binMovie(:,:,fi);
+                showMovie(this, movieType, frames, varargin{:});
+            else
+                disp('You must call readTrackingLog first');
+            end
+        end
+        
+        % -----------------------------------------------------------------
+        function populateStructsFromLog(this) %#ok<MANU>
+            % Moves the information from a separate structure to the main
+            % data structures in the class.  
+            
+        end
+            
+        % -----------------------------------------------------------------
+        function binMovie = makeMovieFromLog(this, frames)
+            % Creates a binary movie for the requested frames from the 
+            % tracking log.  
+            nFrames = length(frames); %#ok<PROP>
+            binMovie = false(this.height, this.width, nFrames); %#ok<PROP>
+            for i = 1:nFrames %#ok<PROP>
+                binMovie(:,:,i) = drawFrame(this.logStruct.frameInfo(i), this.width, this.height);
+            end
+        end
+            
     end %Methods
     
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% STATIC METHODS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
