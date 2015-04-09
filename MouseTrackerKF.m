@@ -484,13 +484,15 @@ classdef MouseTrackerKF < MouseTracker
             
             % plotting part
             if pb
-                plot(this.times, this.exploredLen(:,1), 'g','LineWidth', 2); hold on;
-                plot(this.times, this.exploredLen(:,2), 'r','LineWidth', 2); 
+                plot(this.times/1000, this.exploredLen(:,1), 'g','LineWidth', 2); hold on;
+                plot(this.times/1000, this.exploredLen(:,2), 'r','LineWidth', 2); 
                 xlabel('Time (sec)');
                 ylabel('Length of the trail explored');
             end
             
         end
+        
+       
         % ------------------------------------------------------------------------------------------------------
         function writeMovie(this, filename, movieType, frames, dispCrop, speed)
             % function writeMovie(this, filename, movieType, frames, dispCrop)
@@ -554,19 +556,6 @@ classdef MouseTrackerKF < MouseTracker
             if strcmp(event.Key, 'q') || strcmp(event.Key, 'escape')
                 this.exitMovie = 1;
             end
-        end
-        
-        function save(this, varargin)
-            % Call this function with the filename that you want to save as, otherwise the default is the
-            % name of the videofile.  It will save in the video file directory.
-            [basedir, fn_base, fn_ext] = fileparts(this.videoFN);
-            if ~isempty(varargin)
-                % save with the given filename
-                fn_base = varargin{1};
-            end
-            full_fn = fullfile(basedir, [fn_base '.mat']);
-            save(full_fn, 'this');
-            disp(['Saved object in ' full_fn]);
         end
         
         function mov = returnFrames(this, frames, movieType)

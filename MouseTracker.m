@@ -4,15 +4,15 @@ classdef MouseTracker < handle
         MIN_SIZE_THRESH = 20; %minimal size of a binary area in pixels
         MAX_SIZE_THRESH = 1200;
         videoFN = []; % filename of the video
-        readerObj; %videoReader object 
+        readerObj = ''; %videoReader object 
         framesPerSeg = 150 %the # of frames read at one time
         avgSubsample = 60 %sample every X frames to make the average
-        width % movie dimensions
-        nativeWidth
+        nativeWidth = 1280 % movie dimensions, defaults
+        nativeHeight = 1024
+        width % after cropping
         height
-        nativeHeight
-        crop % number of pixels trimmed from each side of movie
-        frameRate %fps
+        crop = [0 0 0 0]  % number of pixels trimmed from each side of movie
+        frameRate %frames per second
         totalDuration %total length of the movie, sec
         nFrames
         trustFrameCount %mmread sometimes fails to exactly get the number of frames
@@ -64,7 +64,7 @@ classdef MouseTracker < handle
     
     methods
         function this = MouseTracker(varargin)
-            % MouseTrackerUnder(varargin) - This is an object that loads a video and then detects a mouse in that video
+            % MouseTracker(varargin) - This is an object that loads a video and then detects a mouse in that video
             % letting you get the mouse position in various parts of the video.  It does this on an request basis, then 
             % saves the tracking results to minimize memory load. Also, this code is set up to track the position of
             % multiple portions of a binary thresholded image. This is meant to be different parts of the mouse when
@@ -76,24 +76,44 @@ classdef MouseTracker < handle
             % 2 - frame range - a vector of frame numbers to consider as the whole movie, example 1:100
             % 3 - time range - a beginning and end time to consider as the whole movie, in sec, example [60 120].
             % 4 - crop
-            % 5 - filename of tracked data log file that corresponds to the
-            % movie
-            
-            % This is all to just make sure that the file is opened correctly, and that it will take a filename,
-            % directory or nothing.
-            movie_folder = ''; filename = '';
-            if (nargin > 0)
+            % 5 - filename of tracked data log file that corresponds to the movie
+            movie_folder = ''; filename = ''; loadVideo = 0;
+            spec_frames = []; spec_timerange = []; spec_crop = [];
+            if nargin > 0
                 filename = varargin{1};
+            end
+            if nargin > 1
+                spec_frames = varargin{2};
+            end
+            if nargin > 2
+                spec_timerange = varargin{3};
+            end
+            if nargin > 3
+                spec_crop = varargin{4};
+            end
+            % Figure out the filename
+            if ~isempty(filename)
                 if exist(filename, 'dir') % a folder was specified
                     movie_folder = filename;
                     filename = '';
                 elseif exist(filename, 'file') % a valid filename is specified
-                    this.videoFN = filename;
+                    [base_dir, base_fn, ext] =  fileparts(filename);
+                    if strcmp(ext, '.mat')
+                        loadVideo = 0;
+                    elseif strcmp(ext, '.avi') || strcmp(ext,'.m4v') || strcmp(ext,'.mpg')
+                        loadVideo = 1;
+                    elseif strcmp(ext, '.txt')
+                        this.logFile = 1;
+                        this.logFN = filename;
+                        loadVideo = 0;
+                    end
+                else
+                    loadVideo = 0;
                 end
-                loadVideo = 1;
             else
                 loadVideo = 0;
             end
+            % Trying to figure out how to load, and whether prompt for a filename
             if (isempty(filename) || ~exist(filename)) && loadVideo % && ~mclIsNoDisplaySet() %a non-complete path was specified, and needs to be chosen
                 movie_folder = '/Volumes/Alexandria/pwj_data/mouse_training/';
                 [filename, movie_folder] = uigetfile([movie_folder '*.*']);
@@ -102,21 +122,32 @@ classdef MouseTracker < handle
                 end
                 this.videoFN = [movie_folder filename];
             elseif ~loadVideo
-                %movie_folder = '/Volumes/Alexandria/pwj_data/mouse_training/';
                 this.videoFN = '';
             else
                 this.videoFN = filename;
             end
             
-            if (nargin > 4) % there is a log file given
+            if ~isempty(spec_crop) %there is a crop vector present
+                this.crop = varargin{4};
+                if isempty(this.crop)
+                    this.crop = [0 0 0 0];
+                end
+                this.width = this.readerObj.width - sum(this.crop(1:2));
+                this.height = this.readerObj.height - sum(this.crop(3:4));
+            else
+                this.crop = [ 0 0 0 0];
+                this.width = this.nativeWidth;
+                this.height = this.nativeHeight;
+            end
+            
+            if (nargin > 4) % there is an additional log file given
                 this.logFile = 1;
                 this.logFN = varargin{5};
             end
             
-            [base_dir, base_fn, ext] =  fileparts(this.videoFN);
-            mat_fn = fullfile(base_dir, [base_fn '.mat']);
-            if exist(mat_fn, 'file')
-                % then load the saved file
+             mat_fn = fullfile(base_dir, [base_fn '.mat']); % make a '.mat' filename
+            % Branch on what to load 1) mat file 2) video file 3) log file
+            if exist(mat_fn, 'file')  % then load the saved mat file
                 disp(['Loading the saved object for: ' mat_fn]);
                 arg_vidFN = this.videoFN;
                 try
@@ -130,98 +161,110 @@ classdef MouseTracker < handle
                 else
                     this = saved.this;
                 end
-                if exist(this.videoFN, 'file')
-                    this.findMovieFile(this.videoFN);
-                elseif (exist(arg_vidFN)) %if files are moved, resolve
-                    this.findMovieFile(arg_vidFN);
-                else
-                    error('There is no valid movie file specified. Cannot load object');
+                if ~isempty(this.videoFN)
+                    if exist(this.videoFN, 'file')
+                        this.findMovieFile(this.videoFN);
+                    elseif (exist(arg_vidFN)) %if files are moved, resolve
+                        this.findMovieFile(arg_vidFN);
+                    else
+                        error('There is no valid movie file specified. Cannot load object');
+                    end
                 end
                 this.videoFN = arg_vidFN; %for some reason, in no case does the full video filename gets saved
-            elseif loadVideo %initialize normally 
-                if this.logFile == 1
-                    this.readTrackingLog();
+            elseif loadVideo %initialize normally, using movie 
+                this = this.initWithMovie(this.videoFN, spec_timerange, spec_frames);
+                if this.logFile
+                    this.initWithLog(this.logFN);
                 end
-                % Read just a couple of frames to get an idea of video speeds, etc.
-                this.readerObj = VideoReader(this.videoFN);
-                this.frameRate = this.readerObj.FrameRate;
-                this.nativeWidth = this.readerObj.Width;
-                this.nativeHeight = this.readerObj.Height;
-                this.fcPeriod = round(this.frameRate);
-                if (nargin > 3) %there is a crop vector present
-                    this.crop = varargin{4};
-                    if isempty(this.crop)
-                        this.crop = [0 0 0 0];
-                    end
-                    this.width = this.readerObj.width - sum(this.crop(1:2));
-                    this.height = this.readerObj.height - sum(this.crop(3:4));
-                else
-                    this.crop = [ 0 0 0 0];
-                    this.width = this.nativeWidth;
-                    this.height = this.nativeHeight;
-                end
-
-                % figure out the range of frames to be considered
-                time_range = []; this.frameRange = [];
-                if (nargin > 1) %use the time range specified
-                    time_range = varargin{3};
-                    t_offset = time_range(1);
-                    fr = round((time_range)*this.frameRate + 1);
-                    if (fr(2) > this.readerObj.NumberOfFrames)
-                        fr(2) = this.readerObj.NumberOfFrames;
-                    end
-                    if nargin > 1
-                        spec_fr = varargin{2};
-                    else 
-                        spec_fr = [];
-                    end
-                    if isempty(spec_fr)
-                        this.frameRange = fr(1):fr(2);
-                    else
-                        this.frameRange = spec_fr;
-                    end
-                    
-                end
-                if isempty(this.frameRange) % then specify the whole video's range
-                    this.frameRange = 1:this.readerObj.NumberOfFrames; %undershoot to avoid potential problems
-                    this.trustFrameCount = 1;
-                end
-                
-                % read in enough frames to create the average frame
-                disp('MouseTracker: reading movie to make average frame');
-                avgRange = 1:this.avgSubsample:length(this.frameRange);
-                while (length(avgRange) < 20)
-                    this.avgSubsample = floor(this.avgSubsample/2);
-                    avgRange = 1:this.avgSubsample:length(this.frameRange);
-                end
-                vidArray = this.readFrames(this.listToIntervals(avgRange), 'discontinuous');
-                this.avgFrame = uint8(mean(vidArray, 3));
-
-                % Populate the fields with empty data
-                this.nFrames = length(this.frameRange);
-                this.times = ((1:this.nFrames)-1)/this.frameRate; % time vector starts at 0
-                
-                if this.logFile == 1
-                    this.alignTrackingLog();
-                    this.nFrames = length(this.logStruct.frameInfo);
-                    this.frameRange = 1:this.nFrames;
-                    this.frameRate = this.logStruct.movieSubsample*this.frameRate;
-                    this.times = zeros(this.nFrames, 1);
-                    for ii = 1:this.nFrames
-                        this.times(ii) = this.logStruct.frameInfo(ii).t - this.logStruct.frameInfo(1).t;
-                    end
-                    this.frameRate = 1/(nanmean(diff(this.times))/1000);
-                end
-                %initialize tracked areas
+                %initialize tracking data
                 this.clearCalcData();
             else
                 this.nFrames = 0;
+                if this.logFile
+                    % initialize based on the log file instead of a movie
+                    this = this.initWithLog(this.logFN);
+                end
                 this.clearCalcData();
             end
         end %function MouseTracker
         
-       
+         % ------------------------------------------------------------------------------------------------------
+        function this = initWithMovie(this, filename, spec_timerange, spec_frames) 
             
+            % Read just a couple of frames to get an idea of video speeds, etc.
+            this.readerObj = VideoReader(this.videoFN);
+            this.frameRate = this.readerObj.FrameRate;
+            this.nativeWidth = this.readerObj.Width;
+            this.nativeHeight = this.readerObj.Height;
+            this.fcPeriod = round(this.frameRate);
+            
+            % figure out the range of frames to be considered
+            this.frameRange = [];
+            if ~isempty(spec_timerange) % figure out the frames from times
+                time_range = spec_timerange;
+                t_offset = time_range(1);
+                fr = round((time_range)*this.frameRate + 1);
+                if (fr(2) > this.readerObj.NumberOfFrames)
+                    fr(2) = this.readerObj.NumberOfFrames;
+                end
+                if isempty(spec_frames) % use frames if specified
+                    this.frameRange = fr(1):fr(2);
+                else
+                    this.frameRange = spec_frames;
+                end
+                
+            end
+            if isempty(this.frameRange) % then specify the whole video's range
+                this.frameRange = 1:this.readerObj.NumberOfFrames; %undershoot to avoid potential problems
+                this.trustFrameCount = 1;
+            end
+            
+            % read in enough frames to create the average frame
+            disp('MouseTracker: reading movie to make average frame');
+            avgRange = 1:this.avgSubsample:length(this.frameRange);
+            while (length(avgRange) < 20)
+                this.avgSubsample = floor(this.avgSubsample/2);
+                avgRange = 1:this.avgSubsample:length(this.frameRange);
+            end
+            vidArray = this.readFrames(this.listToIntervals(avgRange), 'discontinuous');
+            this.avgFrame = uint8(mean(vidArray, 3));
+            
+            % Populate the fields with empty data
+            this.nFrames = length(this.frameRange);
+            this.times = ((1:this.nFrames)-1)/this.frameRate; % time vector starts at 0
+        end
+        
+        % ------------------------------------------------------------------------------------------------------
+        function this = initWithLog(this, filename) 
+            if isempty(this.videoFN)
+                this.readerObj = '';
+            end
+            this.readTrackingLog(filename);
+            if ~isempty(this.videoFN)
+                this.alignTrackingLog();
+            end
+            this.nFrames = length(this.logStruct.frameInfo);
+            this.frameRange = 1:this.nFrames;
+            this.avgFrame = zeros(this.height, this.width);
+            
+            % Need to construct a time vector with uneven sampling, and
+            % filling in those entries when there were no detected objects
+            this.times = zeros(this.nFrames, 1);
+            t = [this.logStruct.frameInfo.t];
+            first_t = find(t>0, 1,'first');
+            dt = diff(t); 
+            mean_dt = nanmean(dt);
+            toff = t(first_t) - (first_t*mean_dt);
+            this.times(1) = 0;
+            for ii = 2:this.nFrames
+                this.times(ii) = this.logStruct.frameInfo(ii).t - toff;
+                if isnan(this.times(ii))
+                    this.times(ii) = this.times(ii-1) + mean_dt;
+                end
+            end
+            this.frameRate = 1000/mean_dt;
+        end
+        
         % ------------------------------------------------------------------------------------------------------
         function [wantedCOM, nose] = mousePosition(this, time_range)
         % function [wantedCOM, nose] = mousePosition(this, time_range)    
@@ -587,7 +630,11 @@ classdef MouseTracker < handle
         function save(this, varargin)
             % Call this function with the filename that you want to save as, otherwise the default is the
             % name of the videofile.  It will save in the video file directory.
-            [basedir, fn_base, fn_ext] = fileparts(this.videoFN);
+            if ~isempty(this.videoFN)
+                [basedir, fn_base, fn_ext] = fileparts(this.videoFN);
+            else
+                [basedir, fn_base, fn_ext] = fileparts(this.logFN);
+            end
             if ~isempty(varargin)
                 % save with the given filename
                 fn_base = varargin{1};
@@ -1748,10 +1795,10 @@ classdef MouseTracker < handle
             if nargin >= 2
                 filestr = varargin{1}; % first arg is 'this'
             else
-                [path, fn, ext] = fileparts(this.videoFN);
-                [basename, rem] = strtok(fn, '_');
+                [path, fn, ~] = fileparts(this.videoFN);
+                [basename, ~] = strtok(fn, '_');
                 expr = [basename, '_(.*)-0000'];
-                [matchstart,matchend,tokenindices,matchstring,tokenstring,tokenname,splitstring]= regexp(fn,expr);
+                [~,~,~,~,tokenstring,~,~]= regexp(fn,expr);
                 timestr = tokenstring{1}; 
                 timestr = timestr{1}; %f'ing stupid cell nesting
                 filestr = [path filesep basename '_trackingLog_' timestr '.txt'];
@@ -1760,21 +1807,21 @@ classdef MouseTracker < handle
                 disp('Cannot find the specified log file');
                 return;
             end
-            logStruct = readCCVLog(filestr);
-            this.logStruct = logStruct;
+            log = readCCVLog(filestr);
+            this.logStruct = log;
             % Copy the path structure
-            if (logStruct.nSkelPaths > 0)
-                this.paths = logStruct.skelPaths;
-                this.fullPaths = logStruct.paths;
-                w = size(logStruct.binMovie,2); h = size(logStruct.binMovie,1);
-                for ii = 1:logStruct.nSkelPaths
+            if (log.nSkelPaths > 0)
+                this.paths = log.skelPaths;
+                this.fullPaths = log.paths;
+                w = size(log.binMovie,2); h = size(log.binMovie,1);
+                for ii = 1:log.nSkelPaths
                     this.paths(ii).PixelIdxList = sub2ind([h,w], this.paths(ii).PixelList(:,2), this.paths(ii).PixelList(:,1));
                     this.fullPaths(ii).PixelIdxList = sub2ind([h,w], this.fullPaths(ii).PixelList(:,2), this.fullPaths(ii).PixelList(:,1));
                 end
-            elseif (logStruct.nPaths > 0)
-                this.paths = logStruct.paths;
-                w = size(logStruct.binMovie,2); h = size(logStruct.binMovie,1);
-                for ii = 1:logStruct.paths
+            elseif (log.nPaths > 0)
+                this.paths = log.paths;
+                w = size(log.binMovie,2); h = size(log.binMovie,1);
+                for ii = 1:log.paths
                     this.paths(ii).PixelIdxList = sub2ind([h,w], this.paths(ii).PixelList(:,2), this.paths(ii).PixelList(:,1));
                 end
             end
@@ -1836,7 +1883,7 @@ classdef MouseTracker < handle
             nFrames = length(frames); %#ok<PROP>
             binMovie = false(this.height, this.width, nFrames); %#ok<PROP>
             for i = 1:nFrames %#ok<PROP>
-                binMovie(:,:,i) = drawFrame(this.logStruct.frameInfo(i), this.width, this.height);
+                binMovie(:,:,i) = drawFrame(this.logStruct.frameInfo(frames(i)), this.width, this.height);
             end
         end
             
