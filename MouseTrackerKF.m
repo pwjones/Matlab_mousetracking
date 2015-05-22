@@ -210,12 +210,12 @@ classdef MouseTrackerKF < MouseTracker
             ylim([0 this.height]);
             for ii=1:length(frames)
                 fi = frames(ii);
-                %line('Parent', ah, 'Xdata', this.bodyCOM(fi,1), 'Ydata', this.bodyCOM(fi,2), ...
-                %        'Marker', '.','MarkerSize', 8, 'Color', c);
+                line('Parent', ah, 'Xdata', this.bodyCOM(fi,1), 'Ydata', this.bodyCOM(fi,2), ...
+                       'Marker', '.','MarkerSize', 8, 'Color', c);
                 if ~isnan(this.noseblob(fi))
                     % So, this way we can't plot a solid line.
-                    line('Parent', ah, 'Xdata', this.nosePos(fi,1), 'Ydata', this.nosePos(fi,2), ...
-                        'Marker', '.','MarkerSize', 8, 'Color', c);
+%                     line('Parent', ah, 'Xdata', this.nosePos(fi,1), 'Ydata', this.nosePos(fi,2), ...
+%                         'Marker', '.','MarkerSize', 8, 'Color', c);
                 end
             end 
         end
@@ -393,7 +393,8 @@ classdef MouseTrackerKF < MouseTracker
         function plotOrientation(this, frames)
             % function plotOrientation(this, frames)
             if ~exist('frames', 'var') || isempty(frames); frames = 1:this.nFrames; end
-            orient = this.headingFromBodyToNose(frames);
+            %orient = this.headingFromBodyToNose(frames);
+            orient = this.headingFromMotion_TrailRelative(frames,1);
             cm_vals = linspace(-pi,pi,128);
             [cm, ~, cvals] = getIndexedColors('colormapc', cm_vals, 0);
             cinds = zeros(size(orient))*NaN;
@@ -1486,10 +1487,11 @@ classdef MouseTrackerKF < MouseTracker
                 trailPos = this.pathVertices(pathNum).PixelList;
                 distm = ipdm(single(nosePos), single(trailPos));
                 %distm = ipdm(nosePos, trailPos, 'Subset', 'SmallestFew', 'limit', 10);
-                % Must figure out if the animals' nose is over the trail or not. Do this by getting the 4
+                % Must figure out if the animals' nose is over the trail or
+                % not. Do this by getting the 4
                 % closest trail points to each nose position and see if they encircle it.
-                noseDist = NaN*zeros(size(nosePos,1),4); 
-                closestTrailP = ones(size(nosePos,1),2,4);
+                noseDist = NaN*zeros(size(nosePos,1),6); 
+                closestTrailP = ones(size(nosePos,1),2,6);
                 for ii = 1:6
                     [noseDist(:,ii), mini] = nanmin(distm, [], 2); %get the minimum value
                     li = sub2ind(size(distm), (1:size(nosePos,1))', mini);
@@ -1498,8 +1500,22 @@ classdef MouseTrackerKF < MouseTracker
                 end
                 over = isContained(nosePos, closestTrailP);
                 
+                % When the nose is close, the angles to whole number
+                % vertices deviate from the continuous position of the nose
+                % and the trail. Need to correct for this. When the
+                % distance is <6px then the error is <5deg, which is
+                % acceptable and under the normal turning variation.
+%                 closei = find(noseDist < 6);
+%                 for ii = 1:length(closei)
+%                     up = ceil(nosePos);
+%                     down = floor(nosePos);
+%                     dists
+%                     for jj = 1:2
+%                     end
+%                 end
                 noseDist = noseDist(:,1);
                 vects = closestTrailP(:,:,1) - nosePos;
+                
                 
                 noseDist(over) = 0; %set those points to zero because the nose IS over the trail itself
             else % if there are no paths return zeros, but if there are return a mock path result
@@ -1565,22 +1581,82 @@ classdef MouseTrackerKF < MouseTracker
             headingVect = theta;
         end
         
+        % ---------------------------------------------------------------------------------------------------
+        function headingVect = headingFromMotion(this, frames)
+        %function headingVect = headingFromBodyToNose(this, frames)   
+        %
+            if isempty(frames)
+                frames = 1:this.nFrames;
+            end
+            headingVect = gaussianFilter(this.direction, 1,'conv');
+            headingVect = headingVect(frames);
+        end
+        
+        % ---------------------------------------------------------------------------------------------------
+        function [fromOrthogonal, fromParallel, orthoTheta] = headingFromMotion_TrailRelative(this, frames, pathNum)
+        %function [fromOthogonal, fromParallel] = headingFromMotion_TrailRelative(this, frames, pathNum)
+        %
+        % Two functional outputs:
+        % 1) fromOthogonal - the angle relative to the orthogonal vector to
+        % the closest point on the trail.
+        % 2) fromParallel - the angle relative to the vector parallel to
+        % the trail (orthogonal to the orthogonal vector). Importantly,
+        % this vector is sign flipped based on the side of the trail the
+        % animal is on, so that when the animal crosses the trail it stays
+        % in the same direction rather than turning 180 deg.  
+            pb=0;
+            if isempty(frames)
+                frames = 1:this.nFrames;
+            end
+            absHeading = this.headingFromMotion(frames);
+            [noseDist, ~, orthoTheta] = this.orthogonalDistFromTrail(frames,pathNum);
+            %orthoTheta = mod(cart2pol(vects(:,1), vects(:,2)),2*pi); %the orientation of the vector to the closest trail point
+            fromOrthogonal = circ_dist(absHeading, orthoTheta);
+            %[~, fromOrthogonal2] = rotationDirection(orthoTheta, absHeading);
+            absCheck = mod(fromOrthogonal + orthoTheta, 2*pi);
+            isright = (noseDist > 0); paraVect = orthoTheta;
+            paraVect(isright) = orthoTheta(isright) + pi/2; paraVect(~isright) = orthoTheta(~isright) + 3*pi/2;
+            fromParallel = circ_dist(absHeading, paraVect); 
+            %headingVect = relToTrail;
+            if pb
+                this.plotNosePosition(frames);
+                % Vector to subtract
+                %[upara, vpara] = pol2cart(paraVect,abs(noseDist));
+                %quiver(this.nosePos(frames,1), this.nosePos(frames,2), upara, vpara,'b', 'AutoScale', 'off');
+                %hold on;
+                [u, v] = pol2cart(orthoTheta,abs(noseDist));
+                quiver(this.nosePos(frames,1), this.nosePos(frames,2), u, v,'b', 'AutoScale', 'off');
+                hold on;
+                % Red - absolute heading
+                [u,v] = pol2cart(absHeading, 1);
+                quiver(this.nosePos(frames,1), this.nosePos(frames,2), u, v, 'r','AutoScale', 'off');
+                [u, v] = pol2cart(absCheck,1);
+                quiver(this.nosePos(frames,1), this.nosePos(frames,2), u, v, 'k', 'AutoScale', 'off');
+                % Magenta - relative heading
+                [u,v] = pol2cart(fromParallel, 2);
+                quiver(this.nosePos(frames,1), this.nosePos(frames,2), u, v, 'm', 'AutoScale', 'off');
+                %[u,v] = pol2cart(fromOrthogonal2, 3);
+                %quiver(this.nosePos(frames,1), this.nosePos(frames,2), u, v, 'c', 'AutoScale', 'off');
+                scalea = linspace(0,2*pi, 9);
+                scaler = (1:8) * 3 + 20;
+                [u, v]  = pol2cart(scalea(1:end-1), scaler);
+                quiver(50*ones(1,8), 50*ones(1,8), u, v, 'AutoScale', 'off');
+            end
+        end
+        
         % ------------------------------------------------------------------------------------------------------
-        function dists = orthogonalDistFromTrail(this, frames, pathNum)
+        function [dists, thetaDiff, orthoTheta] = orthogonalDistFromTrail(this, frames, pathNum)
         % function dists = orthogonalDistFromTrail(this, frames)
         % 
         % This function returns a signed value - leftward is negative, 
         % rightward is positive! Let's put several pieces together
             if isempty(frames) frames = 1:this.nFrames; end
             [noseDist, vects, ~] = this.noseDistToTrail(frames, pathNum);
-            orthoTheta = mod(cart2pol(vects(:,1), vects(:,2)),2*pi);
-            headingTheta = mod(this.headingFromBodyToNose(frames),2*pi);
-            rotations = rotationDirection(headingTheta, orthoTheta);
-            %rotations = mod(headingTheta - orthoTheta, 2*pi);
-            %negi = rotations > pi;
+            orthoTheta = mod(cart2pol(vects(:,1), vects(:,2)),2*pi); %the orientation of the vector to the closest trail point
+            headingTheta = mod(this.headingFromBodyToNose(frames),2*pi); %the orientation of the animal
+            [rotations, thetaDiff] = rotationDirection(headingTheta, orthoTheta); 
             dists = noseDist;
             dists = dists .* rotations; %gives it a sign
-            %dists(negi) = -1*dists(negi); %switch the sign of some
             
         end
         
@@ -1620,35 +1696,54 @@ classdef MouseTrackerKF < MouseTracker
             end
         end    
         
-        % function findFollowingTurns(this, frames, pathNum, threshDist)
+        
         % -----------------------------------------------------------------------------------------------------
-        function [turnFrames, dir, dists] = findFollowingTurns(this, frames, pathNum, threshDist, wind)
-            pb = 0;
+        function [turnFrames, dir, dists] = findFollowingTurns(this, frames, pathNum, threshDist, wind, varargin)
+        % function [turnFrames, dir, dists] = findFollowingTurns(this, frames, pathNum, threshDist, wind)
+        %
+        % turnFrames - the list of frames where turns were detected
+        % dir - direction of the turn. -1: rightward, 1: leftward
+        % dists - the orthogonal distance from the trail in a window around
+        % the turn.
+
+            if nargin > 5
+                pb = varargin{1};
+            else
+                pb = 0;
+            end
             vel_conv = this.mm_conv * this.frameRate;
             if pb
                 figure; hold on;
             end
-            thresh_vel = 40;
-            filt_vel = gaussianFilter(this.noseVel, 2, 'conv') .* vel_conv;
+            thresh_vel = [40 200];
+            thresh_theta = [.1745 2.9671]; 
+            filt_vel = gaussianFilter(this.noseVel, 2.5, 'conv') .* vel_conv;
             followingFrames = this.getFollowingSegments(frames, pathNum, threshDist);
             turnFrames = []; dir = []; dists = [];
             for ii = 1:size(followingFrames, 1)
                 fr = followingFrames(ii,1):followingFrames(ii,2);
-                vel_pass = filt_vel(fr) > thresh_vel;
-                dists = this.orthogonalDistFromTrail(fr, pathNum);
-                smooth_dists = gaussianFilter(dists, 1.5,'conv', 'valid'); %do the smoothing of position beforehand
+                vel_pass = filt_vel(fr) > thresh_vel(1) & filt_vel(fr) < thresh_vel(2);
+                [dists, thetaDiff] = this.orthogonalDistFromTrail(fr, pathNum);
+                theta_pass = abs(thetaDiff) >= thresh_theta(1) & abs(thetaDiff) <= thresh_theta(2);
+                vel_pass = vel_pass & theta_pass;
+                smooth_dists = gaussianFilter(dists, 2,'conv', 'valid'); %do the smoothing of position beforehand
                 [~, turnInds,dirs] = findMinAndMaxPeaks(smooth_dists, -20, 2, 0, 0); %signal, threshold, window width, filter width
                 vp_turns = vel_pass(turnInds);
                 turnFrames = cat(1, turnFrames, turnInds(vp_turns) + fr(1) - 1);
                 dir = cat(1, dir, dirs(vp_turns));
                 %turns = turns & vel_pass; % just keep those turns that happen above a certain velocity
                 %turnFrames = cat(1, turnFrames, find(turns) + fr(1) - 1);
-                
-                
-                if pb
-                    plot(dists); 
-                    plot(turnInds, dists(turnInds), 'ro');
-                    hold on; plot(smooth_dists, 'g'); 
+
+                if pb        
+                    subplot(2,1,1);
+                    plot(this.times(fr), dists); 
+                    plot(this.times(fr(turnInds)), dists(turnInds), 'ro');
+                    hold on; plot(this.times(fr), smooth_dists, 'g'); 
+                    xlabel('Time'); ylabel('Lateral distance from Trail'); 
+                    
+                    subplot(2,1,2);
+                    hold on; plot(this.times(fr), this.headingFromMotion_TrailRelative(fr,pathNum));
+                    xlabel('Time'); ylabel('Movement heading');
                 end
             end 
             
@@ -1738,7 +1833,7 @@ classdef MouseTrackerKF < MouseTracker
             end
             %traillNum = 1; % Eventually we need 2+ trails
             if nargin < 4 %default distance
-                threshDist = 10;
+                threshDist = 20;
             end
             distTraveled = [];
             frameNums = [];
@@ -1887,7 +1982,8 @@ classdef MouseTrackerKF < MouseTracker
                 end
                 pathIm = this.plotPaths()*4;
                 bf = bf+pathIm + uint8(logIm)*3;
-                imshow(label2rgb(bf, 'cool','k')); hold on;  
+                %imshow(label2rgb(bf, 'cool','k')); hold on; 
+                imshow(bf*255); hold on; 
                 %f = label2rgb(bf, 'cool','k');
                 %pos = max(f,3); pos(logIm) = 255;
                 %neg = max(f,3); f; neg(logIm) = 0;
@@ -1927,7 +2023,7 @@ classdef MouseTrackerKF < MouseTracker
                 end
                 if (~isnan(this.noseblob(framei)))
                     line(this.areas(framei,this.noseblob(framei)).Centroid(1), this.areas(framei,this.noseblob(framei)).Centroid(2), ...
-                        'Marker', '+', 'Color', 'g','MarkerSize', 8, 'LineWidth',2);
+                        'Marker', '+', 'Color', 'g','MarkerSize', 12, 'LineWidth',2);
 %                    [xv,yv] = pol2cart(this.orient(framei), this.vel(framei));
 %                    quiver(this.areas(framei, this.noseblob(framei)).Centroid(1), this.areas(framei,this.noseblob(framei)).Centroid(2), xv, yv, 0);
                 end

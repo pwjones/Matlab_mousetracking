@@ -44,6 +44,10 @@ x0 = [nanmean(all_dists), 1];
 % make a PDF of the distribution of distances
 counts = hist(all_dists, xbins);
 count_dist = counts./nansum(counts);
+% for a measure, let's take the percentiles for 17.24 mm (the 20 px
+% threshold distance
+pbelow = sum(all_dists < -17.24)./sum(~isnan(all_dists))
+pabove = sum(all_dists > 17.24)./sum(~isnan(all_dists))
 
 % use mle rather than lsqcurvefit for fitting a distribution - it's supposedly the right 
 mle_fit_params = mle(all_dists, 'pdf', mlePDF, 'start', double(x0), 'cdf', mleCDF);

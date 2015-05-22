@@ -111,12 +111,14 @@ classdef MouseTracker < handle
                     loadVideo = 0;
                 end
             else
-                loadVideo = 0;
+                loadVideo = 1;
             end
             % Trying to figure out how to load, and whether prompt for a filename
             if (isempty(filename) || ~exist(filename)) && loadVideo % && ~mclIsNoDisplaySet() %a non-complete path was specified, and needs to be chosen
                 movie_folder = '/Volumes/Alexandria/pwj_data/mouse_training/';
                 [filename, movie_folder] = uigetfile([movie_folder '*.*']);
+                [~, base_fn, ext] =  fileparts(filename);
+                base_dir = movie_folder;
                 if filename == 0 % the user has canceled the file selection
                     return;
                 end
@@ -145,7 +147,7 @@ classdef MouseTracker < handle
                 this.logFN = varargin{5};
             end
             
-             mat_fn = fullfile(base_dir, [base_fn '.mat']); % make a '.mat' filename
+            mat_fn = fullfile(base_dir, [base_fn '.mat']); % make a '.mat' filename
             % Branch on what to load 1) mat file 2) video file 3) log file
             if exist(mat_fn, 'file')  % then load the saved mat file
                 disp(['Loading the saved object for: ' mat_fn]);

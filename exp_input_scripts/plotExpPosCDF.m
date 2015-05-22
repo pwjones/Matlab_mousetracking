@@ -1,7 +1,7 @@
 % Take a structure loaded in the workspace (perMouseData) and come up with a CDF of nose position around
 % the trail.
 
-thresh_dist = 20; %px for now
+thresh_dist = 40; %px for now
 vel_thresh = 40; %mm/sec
 mm_conv = .862; 
 

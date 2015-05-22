@@ -8,6 +8,10 @@
 % concatenate each segment of following together, and use that as our
 % time-series data.
 
+% What to plot 
+plotAcorr = 0; 
+plotSegHist = 0;
+plotResid = 0;
 % Parameters
 nMice = length(perMouseData);
 nRows = ceil(sqrt(nMice));
@@ -34,9 +38,9 @@ dwstat = NaN*zeros(nMice,4);
 ar_means = NaN*zeros(nMice,4);
 e = cell(nMice, 4); fit = cell(nMice, 4);
 med_vel = NaN*zeros(nMice, 4); %median velocities - want to check these
-acorrFigh = figure;
-segLenFigh = figure;
-residFigh = figure;
+if (plotAcorr) acorrFigh = figure; end
+if (plotSegHist) segLenFigh = figure; end
+if (plotResid) residFigh = figure; end
 spectfigh = figure; axes;
 cumfigh = figure;
 
@@ -108,23 +112,16 @@ for jj = 1:nMice
     
     % Spectral analysis of the following nose positions in order to look at
     % scanning of the trail
-    %[f,S] = noseSpectAnal2(makePaddedMatFromCell(followingSegs),1/40);
-    %figure(spectfigh); hold on; plot(f,S);
+    distMat = makePaddedMatFromCell(followingSegs);
+    distMat_filt = gaussianFilter(distMat, 3);
+    [f,S] = noseSpectAnal2(distMat_filt,1/40);
+    figure(spectfigh); hold on; plot(f,S);
     
-    figure(segLenFigh);
-    subplot(nRows, nRows, jj); hold on;
-    hist(segLen, 100);
-%     posTS = timeseries(ts, 1:length(ts), 'Name', 'Distance From Trail'); 
-%     posTS.DataInfo.Units = 'mm';
-%     tscol = tscollection(posTS, 'Name', mouse_names{jj});
-%     cumTS = timeseries(cumsum(posTS.Data), 1:length(ts), 'Name', 'Cumulative Distance');
-%     tscol = addts(tscol, cumTS);
-%     if ~isempty(ctl_trials{jj})
-%         epochi = find(trialCount >= ctl_trials{jj}(1) & trialCount <= ctl_trials{jj}(end));
-%         data = posTS.Data(epochi);
-%         sum(isnan(data));
-%         [fitp, fitp_ci, e, fit] = fitARmodel(data, 5);
-%     end
+    if (plotSegHist)
+        figure(segLenFigh);
+        subplot(nRows, nRows, jj); hold on;
+        hist(segLen, 100);
+    end
     
     % Want to do some linear fits to the various training epochs
     if ~isempty(ctl_trials{jj})
@@ -133,12 +130,14 @@ for jj = 1:nMice
         epochi = find(trialCount >= ctl_trials{jj}(1) & trialCount <= ctl_trials{jj}(end));
         
         
-        [f,S, tah, fah] = noseSpectAnal2(ts(epochi),1/40);
-        figure(spectfigh); hold on; plot(f,S);
-        tsbreaks = cumsum(segLen);
-        axes(tah); hold on; 
-        t = 1:length(ts(epochi)
-        plot(tah, tsbreaks, zeros(size(tsbreaks)), 'r.');
+%         [f,S, tah, fah] = noseSpectAnal2(ts(epochi),1/40);
+%         figure(spectfigh); hold on; plot(f,S);
+%         tsbreaks = cumsum(segLen);
+%         if isempty(tah)
+%             figure; tah = axes; hold on;
+%         end
+%         axes(tah); hold on; 
+%         plot(tah, tsbreaks./40, zeros(size(tsbreaks)), 'r.');
         
         %linear trend fit of cumulative
         fitx = epochi - epochi(1);
@@ -171,10 +170,12 @@ for jj = 1:nMice
         subplot(nMice, 4, 4*(jj-1)+1); hold on;
         plot(e{jj,1}(1:end-1), e{jj,1}(2:end),'k.');
         % Plot the autocorrelation function of this dataset
-        figure(acorrFigh);
-        subplot(nRows, nRows, jj); hold on;
-        [acorr, lags] = xcorr(ts(epochi), corrWidth, 'unbiased');
-        plot(lags, acorr, 'k');
+        if plotAcorr
+            figure(acorrFigh);
+            subplot(nRows, nRows, jj); hold on;
+            [acorr, lags] = xcorr(ts(epochi), corrWidth, 'unbiased');
+            plot(lags, acorr, 'k');
+        end
         med_vel(jj,1) = median(abs(diff(ts(epochi))));
         %plot(epochi((AR_width+2):end), cum_ts(epochi(1)+AR_width-1)+cumsum(fit{jj,1}), '--', 'Color',[.5 .5 .5]);
     end
@@ -210,10 +211,12 @@ for jj = 1:nMice
         subplot(nMice, 4, 4*(jj-1)+2); hold on;
         plot(e{jj,2}(1:end-1), e{jj,2}(2:end),'.', 'Color', [.5 .5 .5]);
         % Plot the autocorrelation function of this dataset
-        figure(acorrFigh); hold on;
-        [acorr, lags] = xcorr(ts(epochi), corrWidth, 'unbiased');
-        plot(lags, acorr, 'Color', [.5 .5 .5]);
-        med_vel(jj,2) = median(abs(diff(ts(epochi))));
+        if plotAcorr
+            figure(acorrFigh); hold on;
+            [acorr, lags] = xcorr(ts(epochi), corrWidth, 'unbiased');
+            plot(lags, acorr, 'Color', [.5 .5 .5]);
+            med_vel(jj,2) = median(abs(diff(ts(epochi))));
+        end
     else
         slopes(jj,2) = NaN; slope_ci(jj,2) = NaN;
     end
@@ -250,10 +253,12 @@ for jj = 1:nMice
         subplot(nMice, 4, 4*(jj-1)+3); hold on;
         plot(e{jj,3}(1:end-1), e{jj,3}(2:end),'b.');
         % Plot the autocorrelation function of this dataset
-        figure(acorrFigh); hold on;
-        [acorr, lags] = xcorr(ts(epochi), corrWidth, 'unbiased');
-        plot(lags, acorr, 'b');
-        med_vel(jj,3) = median(abs(diff(ts(epochi))));
+        if plotAcorr
+            figure(acorrFigh); hold on;
+            [acorr, lags] = xcorr(ts(epochi), corrWidth, 'unbiased');
+            plot(lags, acorr, 'b');
+            med_vel(jj,3) = median(abs(diff(ts(epochi))));
+        end
     else
         slopes(jj,3) = NaN; slope_ci(jj,3) = NaN;
     end
@@ -288,10 +293,12 @@ for jj = 1:nMice
         subplot(nMice, 4, 4*(jj-1)+4); hold on;
         plot(e{jj,4}(1:end-1), e{jj,4}(2:end),'r.');
         % Plot the autocorrelation function of this dataset
-        figure(acorrFigh); hold on;
-        [acorr, lags] = xcorr(ts(epochi), corrWidth, 'unbiased');
-        plot(lags, acorr, 'r');
-        med_vel(jj,4) = median(abs(diff(ts(epochi))));
+        if plotAcorr
+            figure(acorrFigh); hold on;
+            [acorr, lags] = xcorr(ts(epochi), corrWidth, 'unbiased');
+            plot(lags, acorr, 'r');
+            med_vel(jj,4) = median(abs(diff(ts(epochi))));
+        end
     else
         slopes(jj,4) = NaN; slope_ci(jj,4) = NaN;
     end

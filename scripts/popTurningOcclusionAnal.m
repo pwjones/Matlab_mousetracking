@@ -7,9 +7,10 @@ nRows = ceil(sqrt(nMice));
 fh = figure; hold on;
 dl = [-1, 1];
 wind = -15:15;
-selx = 16:47;
+selx = 16:46;
 centerx = 31;
 
+overlay_fig = figure; ah = axes; hold on;
 figure; % The figure for all of the trajectory plots
 for ii = 1:nMice
     % free the data from the structure
@@ -36,9 +37,10 @@ for ii = 1:nMice
         mean_turns(:,jj) = nanmean(free(selx,sel),2);
         turn_dists(1:nTurn, jj, 1, ii) = free(centerx, sel);  
         if ~isempty(mean_turns)
-            ci = bootci(1000, @nanmean, free(selx,sel)');
+            ci = bootci(1000, {@nanmean, free(selx,sel)'},'type','cper');
             plot_err_poly_asym(gca, wind', mean_turns(:,jj), ci', 'k', [.5 .5 .5], 1);
             hold on;
+            plot(ah, wind', mean_turns(:,jj), 'k-');
         end
     end
     
@@ -61,7 +63,7 @@ for ii = 1:nMice
             nTurn = sum(sel);
             mean_turns(:,jj) = nanmean(free2(selx,sel),2);
             turn_dists(1:nTurn, jj, 2, ii) = free2(centerx, sel);  
-            ci = bootci(1000, @nanmean, free2(selx,sel)');
+            ci = bootci(1000, {@nanmean, free2(selx,sel)'},'type','cper');
             plot_err_poly_asym(gca, wind', mean_turns(:,jj), ci', 'k', [.5 .5 .5], 1);
         end
     end
@@ -83,7 +85,7 @@ for ii = 1:nMice
             nTurn = sum(sel);
             mean_turns(:,jj) = nanmean(occr(selx,sel),2);
             turn_dists(1:nTurn, jj, 3, ii) = occr(centerx, sel);  
-            ci = bootci(1000, @nanmean, occr(selx,sel)');
+            ci = bootci(1000, {@nanmean, occr(selx,sel)'},'type','cper');
             plot_err_poly_asym(gca, wind', mean_turns(:,jj), ci', 'b', [.717 .855 1], 1);
         end
     end
@@ -105,7 +107,7 @@ for ii = 1:nMice
             nTurn = sum(sel);
             mean_turns(:,jj) = nanmean(occl(selx,sel),2);
             turn_dists(1:nTurn, jj, 4, ii) = occl(centerx, sel);  
-            ci = bootci(1000, @nanmean, occl(selx,sel)');
+            ci = bootci(1000,{@nanmean, occl(selx,sel)'},'type','cper');
             plot_err_poly_asym(gca, wind', mean_turns(:,jj), ci', 'r', [1 .78 .847], 1);
         end
     end
@@ -172,6 +174,11 @@ mean_turn_dists_p = mean_turn_dists_p([3 1 2], :);
 %now plot it
 figure; ah = axes; hold on;
 x = [1.5, 2, 2.5];
+plot([1.4, 2.6], [0 0], 'k--');
+xlim([1.4, 2.6]);
+hold on;
+set(gca, 'Ydir', 'reverse', 'TickDir', 'Out');
+
 x = repmat(x, size(mean_turn_dists_p,2), 1);
 plotConnectedCategoricalPoints(ah, x', mean_turn_dists_p, sig_cond);
 
