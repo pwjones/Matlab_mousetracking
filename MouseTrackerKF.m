@@ -4,7 +4,8 @@ classdef MouseTrackerKF < MouseTracker
         used_thresh = 0;
         p_mouse = .0007; %the proportion of pixels that are 
         kf = struct('nstates', {}, 'nob', {}, 's', {});
-        mm_conv = .862; %mm/px linear
+        %mm_conv = .862; %mm/px linear, old res for data pre 2015
+        mm_conv = .7143; %mm/px linear, new resolution (14px/10mm) 
         fullPaths; %the full detected paths, to be saved if the paths are skeletonized
         exploredProp; %the proportions of the trails explored at each timepoint
         exploredLen; %the lengths of the trails explored at each timepoint (in px)
@@ -12,6 +13,7 @@ classdef MouseTrackerKF < MouseTracker
         trailShadow_size = 20;
         pathVerticesDefined = 0;
         pathVertices;
+        colorBG = [];
     end
     
     methods
@@ -210,14 +212,15 @@ classdef MouseTrackerKF < MouseTracker
             ylim([0 this.height]);
             for ii=1:length(frames)
                 fi = frames(ii);
-                line('Parent', ah, 'Xdata', this.bodyCOM(fi,1), 'Ydata', this.bodyCOM(fi,2), ...
-                       'Marker', '.','MarkerSize', 8, 'Color', c);
+                %line('Parent', ah, 'Xdata', this.bodyCOM(fi,1), 'Ydata', this.bodyCOM(fi,2), ...
+                %       'Marker', '.','MarkerSize', 8, 'Color', c);
                 if ~isnan(this.noseblob(fi))
                     % So, this way we can't plot a solid line.
-%                     line('Parent', ah, 'Xdata', this.nosePos(fi,1), 'Ydata', this.nosePos(fi,2), ...
-%                         'Marker', '.','MarkerSize', 8, 'Color', c);
+                    line('Parent', ah, 'Xdata', this.nosePos(fi,1), 'Ydata', this.nosePos(fi,2), ...
+                        'Marker', '.','MarkerSize', 8, 'Color', c);
                 end
-            end 
+            end
+            
         end
         % ------------------------------------------------------------------------------------------------------
         function plotFilterPosition(this,frames)
@@ -544,7 +547,7 @@ classdef MouseTrackerKF < MouseTracker
                     this.showFrame(fi, movieType, dispCrop, overlayMov(:,:,ii));
                 end
                 hold off;
-                pause(1/this.frameRate/1); %faster than the natural framerate due to impatience.
+                pause(1/this.frameRate/10); %faster than the natural framerate due to impatience.
             end
             this.exitMovie = 0;
             set(fh, 'WindowKeyPressFcn', '');
@@ -1399,10 +1402,10 @@ classdef MouseTrackerKF < MouseTracker
         function pathIm = plotPaths(this)
             %returns a binary image (uint8 format) of the detected paths
             
-            pathIm = zeros(this.height, this.width, 'uint8');
+            pathIm = ones(this.height, this.width, 'uint8');
             for ii = 1:length(this.paths)
                 path = this.paths(ii);
-                pathIm(path.PixelIdxList) = 1;
+                pathIm(path.PixelIdxList) = 0;
                 %pathIm = imfill(pathIm,'holes');
             end
         end
@@ -1980,10 +1983,25 @@ classdef MouseTrackerKF < MouseTracker
                         bf(on) = bf(on)+jj;
                     end
                 end
-                pathIm = this.plotPaths()*4;
-                bf = bf+pathIm + uint8(logIm)*3;
+                % way to do it with white trails
+                %pathIm = this.plotPaths*4;
+                %bf = bf+pathIm + uint8(logIm)*3;
+                %imshow(bf*255); hold on; 
+                
+                % way to do it with colored trails
+                if isempty(this.colorBG)
+                    this.colorBG = uint8(this.plotPathsOnBg()); %gives us a colored base
+                end
+                pathIm = this.colorBG;
+                for ii = 1:3  
+                    pathIm(:,:,ii) = (255*bf) + pathIm(:,:,ii);
+                    if ii == 3 || ii==1
+                        pathIm(:,:,ii) = uint8(logIm)*255 + pathIm(:,:,ii);
+                    end
+                end
+                imshow(pathIm); hold on; 
                 %imshow(label2rgb(bf, 'cool','k')); hold on; 
-                imshow(bf*255); hold on; 
+                
                 %f = label2rgb(bf, 'cool','k');
                 %pos = max(f,3); pos(logIm) = 255;
                 %neg = max(f,3); f; neg(logIm) = 0;
