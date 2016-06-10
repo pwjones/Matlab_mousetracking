@@ -54,7 +54,7 @@ end
 pooled = reshape(all_rates, nMice*max_trials, max_days,2);
 mean_pooled = squeeze(nanmean(pooled,1));
 for ii = 1:2
-    plot(squeeze(mean_pooled(:,ii)),'Color', colors{ii},'LineWidth', 2); hold on;
+    plot(squeeze(mean_pooled(:,ii)),'Color', colors{ii},'LineWidth', 3); hold on;
 end
 
 title('Trail Areas');

@@ -1,4 +1,8 @@
-% Process the behavior of the fall cohort of mice.
+% Processes and plots the behavior of the fall cohort of mice. Behavioral
+% measures include the time on trail, proportion of trail, area of
+% trail per time
+%
+% Plots: Plots overall 
 % Peter Jones, 9.20.2013
 
 fallCohortList; % this script contains the mouse and file names to be included in the analysis.
@@ -11,7 +15,14 @@ clear perMouseData;
 
 [videoList, folder_nums, day_nums] = listBehavioralVideos(base_folder, folders, mouse_names);
 
-s = matlabpool('size');
+% The post 2014b way of pool size checking
+s = gcp('nocreate'); % If no pool, do not create new one.
+if isempty(poolobj)
+    s = 0;
+else
+    s = poolobj.NumWorkers;
+end
+
 if s~=0
     parfor ii = 1:length(videoList)
         perMouseData(ii) = loadMouseTracking(videoList{ii}, 1:length(videoList{ii}), following_thresh, skeletonize_paths);
