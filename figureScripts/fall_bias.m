@@ -15,7 +15,7 @@ mm_conv = .862; %mm per px
 nMice = length(perMouseData);
 nRows = ceil(sqrt(nMice));
 fh = figure; hold on;
-for ii = 1:nMice
+for ii = 5:nMice
     %rew_free = perMouseData(ii).rew_dists_from_trail_persect(ctl_trials{ii});
     rew_free = perMouseData(ii).rew_dists_from_trail(ctl_trials{ii});
    

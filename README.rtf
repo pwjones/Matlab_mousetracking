@@ -10,7 +10,9 @@
 
 \b\fs28 Overview
 \b0\fs24 \
-The analyses that are in this folder process the data in stages.  It is designed to work on video files as input.  Each video file is then analyzed (tracked) and the result saved in a MAT file.  Those tracking results are then referenced by scripts and functions that compile results for each mouse over multiple trials and days, and over multiple mice.  Some datasets include recordings of sniffing (thermocouple signals), which are recorded in Igor Pro files and in HD5 format, read by some matlab routines, and integrated/synched with the video records of the behavior.   \
+The analyses that are in this folder process the data in stages.  It is designed to work on video files as input.  Each video file is then analyzed (tracked) and the result saved in a MAT file.  Those tracking results are then referenced by scripts and functions that compile results for each mouse over multiple trials and days, and over multiple mice.  Some datasets include recordings of sniffing (thermocouple signals), which are recorded in Igor Pro files and in HD5 format, read by some matlab routines, and integrated/synched with the video records of the behavior.   
+\b This MATLAB software runs best on a computer with large amount (>= 16GB) of RAM. 
+\b0 This is because of the loading segments of movie, and then saving tracking is pretty memory intensive, as well as processor intensive.  If you have 16GB of RAM you run the processing in parallel with 3 files at once.  \
 \
 
 \b\fs28 \

@@ -65,9 +65,10 @@ for ii=1:nMice
         xlabel('# Days');
         ylabel('Avg Trail Following Efficiency (mm/sec)');
         ylim([0 60]);
-        
+        set(gca, 'TickDir', 'out');  
     end
 end
+% Assemble and plot the mean rates
 arsiz = size(all_rates);
 trial_rates = reshape(all_rates, [arsiz(1)*arsiz(2), arsiz(3), arsiz(4:end)]); %
 mean_rates = squeeze(nanmean(trial_rates, 1));

@@ -74,7 +74,7 @@ subplot(1,3,3);
 stairs(edges', turnToP);
 xlabel('\Delta Distance from Trail (mm)');
 ylabel('Prop Turns Towards Trail');
-legend({'-3to-4', '-3to-2','-2to-1'});
+%legend({'-3 to -4', '-3 to -2','-2 to -1'});
 xlim([-10 10]);
 
 % Figure 2 - Headings Pre and Post Turn
@@ -210,7 +210,9 @@ end
 
 % Two way ANOVA on the turning magnitudes
 all_mags_dd = all_mags_dd(1:end-1, :);
+%all_mags_dd = all_mags_dd';
 buildANOVA2Matrix;
+disp('Doing an ANOVA on turning magnitudes');
 [p, table, stats] = anova2(testM, minelem);
 [c,m,h] = multcompare(stats, 'ctype', 'bonferroni');
 
@@ -277,14 +279,14 @@ subplot(1,3,2);
 stairs(edges', turnTowardsProp);
 xlabel('Distance from Trail (mm)');
 ylabel('Prop Turns Towards Trail');
-legend({'Sniff -2', 'Sniff -1','Sniff 0'});
+%legend({'Sniff -2', 'Sniff -1','Sniff 0'});
 xlim([-15 15]);
 
 subplot(1,3,3);
 stairs(edges', pTurnsLeft);
 xlabel('Distance from Trail (mm)');
 ylabel('Prop Turns Leftwards');
-legend({'Sniff -2', 'Sniff -1','Sniff 0'});
+%legend({'Sniff -2', 'Sniff -1','Sniff 0'});
 xlim([-15 15]);
 
 %% Figure 7 - Turning Magnitudes as a function of sniff position
