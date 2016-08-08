@@ -224,7 +224,7 @@ xlabel('\Delta ND (mm)'); ylabel('Median Turn Mag'); xlim([-10 10]);
 subplot(2,2,2); hold on;
 x = edges_dd(1:end-1) + (edges_dd(2)-edges_dd(1))/2;
 for ii = 1:3
-    plot_err_poly(gca, x', mean_mags_dd(1:end-1,ii), ste_mags_dd(1:end-1,ii), corder{ii}, (corder{ii}+[1 1 1])/2, .5);
+    plot_err_poly(gca, x', mean_mags_dd(1:end-1,ii), ste_mags_dd(1:end-1,ii), corder{ii}, (corder{ii}+[1 1 1])/2);
 end
 xlabel('\Delta ND (mm)'); ylabel('Mean Turn Mag'); xlim([-10 10]);
 subplot(2,2,3);
@@ -233,7 +233,7 @@ xlabel('ND (mm)'); ylabel('Median Turn Mag'); xlim([-15 15]);
 subplot(2,2,4); hold on;
 x = edges_pos(1:end-1) + (edges_pos(2)-edges_pos(1))/2;
 for ii = 1:3
-    plot_err_poly(gca, x', mean_mags_pos(1:end-1,ii), ste_mags_pos(1:end-1,ii), corder{ii}, (corder{ii}+[1 1 1])/2, .5);
+    plot_err_poly(gca, x', mean_mags_pos(1:end-1,ii), ste_mags_pos(1:end-1,ii), corder{ii}, (corder{ii}+[1 1 1])/2);
 end
 xlabel('ND (mm)'); ylabel('Mean Turn Mag'); xlim([-15 15]);
 %plot(sniffData.turnTrig_preTurnDistDiff(:,3), turn_mag, '.k', 'MarkerSize', 6);

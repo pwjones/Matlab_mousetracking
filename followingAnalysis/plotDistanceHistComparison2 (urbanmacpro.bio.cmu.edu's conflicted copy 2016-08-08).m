@@ -41,7 +41,7 @@ for ii = 1:2
 end
     
 counts = cell(2,1); %want to do a reward/distractor, early/late comparison
-nbins = 80;
+nbins = 60;
 dx = .5;
 xbins = linspace(-dist_thresh, dist_thresh, nbins);
 %xcenters = (dx*(0:(length(xbins)-1))) - dist_thresh + (dx/2);

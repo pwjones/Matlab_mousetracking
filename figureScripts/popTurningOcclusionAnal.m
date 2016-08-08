@@ -129,6 +129,7 @@ histx = -20:.5:20;
 mean_turn_dists = squeeze(nanmean(turn_dists));
 h = NaN*zeros(size(mean_turn_dists));
 sig_cond = zeros(size(mean_turn_dists));
+p_cond = zeros(size(mean_turn_dists));
 mean_turn_dists_p = NaN * zeros(size(mean_turn_dists));
 for ii = 2:size(turn_dists,3)
     for jj = 1:2
@@ -147,6 +148,7 @@ for ii = 2:size(turn_dists,3)
             if ~isempty(x1) && ~isempty(x2)
                 [p,h] = ranksum(x1,x2);
                 sig_cond(jj,ii,kk) = h;
+                p_cond(jj,ii,kk) = p;
                 mean_turn_dists_p(jj,ii,kk) = mean_turn_dists(jj,ii,kk) - mean_turn_dists(jj,1,kk);
 %                 (if (h == 1)
 %                     plot(ii, mean_turn_dists(jj,ii,kk) - mean_turn_dists(jj,1,kk), 'ko', 'MarkerFaceColor', 'k', 'MarkerSize', 12);
@@ -162,14 +164,18 @@ end
 
 mean_turn_dists_p = mean_turn_dists_p(:,2:end, :);
 sig_cond = sig_cond(:,2:end,:);
+p_cond = p_cond(:,2:end,:);
 %reorder the dims
 mean_turn_dists_p = permute(mean_turn_dists_p, [2 3 1]);
 sig_cond = permute(sig_cond, [2 3 1]);
+p_cond = permute(p_cond, [2 3 1]);
 % collapse across turn directions
 sig_cond = reshape(sig_cond, size(sig_cond,1), []);
+p_cond = reshape(p_cond, size(p_cond,1), []);
 mean_turn_dists_p = reshape(mean_turn_dists_p, size(mean_turn_dists_p,1), []);
 % reorder the conditions
 sig_cond = sig_cond([3 1 2], :);
+p_cond = p_cond([3 1 2], :);
 mean_turn_dists_p = mean_turn_dists_p([3 1 2], :);
 %now plot it
 figure; ah = axes; hold on;
@@ -179,6 +185,11 @@ xlim([1.4, 2.6]);
 hold on;
 set(gca, 'Ydir', 'reverse', 'TickDir', 'Out');
 
+nComparisons = sum(~isnan(mean_turn_dists_p(:)));
+[fdr] = mafdr( p_cond( ~isnan(mean_turn_dists_p) ), 'BHFDR', true, 'Showplot', false ); 
+sig_cond_fdr = sig_cond;
+sig_cond_fdr( ~isnan(mean_turn_dists_p) ) = fdr < .05;
+sig_cond_bonferroni = (p_cond < .05/nComparisons) & ~isnan(mean_turn_dists_p);
 x = repmat(x, size(mean_turn_dists_p,2), 1);
-plotConnectedCategoricalPoints(ah, x', mean_turn_dists_p, sig_cond);
+plotConnectedCategoricalPoints(ah, x', mean_turn_dists_p, sig_cond_bonferroni);
 

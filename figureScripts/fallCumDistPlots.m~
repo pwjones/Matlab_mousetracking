@@ -2,7 +2,7 @@
 % --------------------
 % The point of this is to analyze the mouse position relative to the trail
 % as a time-series, using models that can then be used to draw statistical
-% conclusions from it.  Quantifying the bias towards one side of the trail or the
+% conclusions from it.  The bias towards one side of the trail or the
 % other, is a goal.  To perform the analysis, we loop through the
 % individual mice and each trial to pick out when they were following,
 % concatenate each segment of following together, and use that as our
@@ -22,7 +22,7 @@ segLenThresh = 125; % n samples in a row minimum for this analysis
 corrWidth = 40;
 AR_width = 3;
 MA_width = 4;
-nboot = 1000; %number of bootstrap resamples
+nboot = 500; %number of bootstrap resamples
 segL = 40; %resampling segment length for bootstrapping
 segSep = 50;
 % anonymous functions used to bootstrap the means of the fitted AR models
@@ -137,8 +137,7 @@ for jj = 1:nMice
 %         hist(segLen, 100);
 %     end
     
-    % Want to do analysis on each behavioral epoch
-    %% The unoccluded epoch
+    % Want to do some linear fits to the various training epochs
     if ~isempty(ctl_trials{jj})
         %fprintf('Control: ');
         % select indices based on the trails numbers that they are pulled from to get the right experimental condition 
@@ -169,7 +168,6 @@ for jj = 1:nMice
         % putting confidence intervals on the mean using moving block bootstrapping
         %[armean(jj,1), armean_ci(jj,1,:), allmeans(jj,1,:)] = mbBootstrap(nboot, anonARmean, ts(epochi), segL, segSep);
         %[armean(jj,1), armean_ci(jj,1,:)] = mbBootstrap(nboot, @fitCumTsSlope, ts(epochi), segL, segSep);
-        
         % Using stationary bootstrap - just going to get means directly from bootstrapped data
         mu_ts(jj,1) = nanmean(y);
         Bstar = opt_block_length_REV_dec07(ts(epochi)); % gives the optimal length for bootstrap blocks
@@ -197,11 +195,10 @@ for jj = 1:nMice
         med_vel(jj,1) = median(abs(diff(ts(epochi))));
         %plot(epochi((AR_width+2):end), cum_ts(epochi(1)+AR_width-1)+cumsum(fit{jj,1}), '--', 'Color',[.5 .5 .5]);
     end
-    %% Do the second or combined control (unoccluded) epoch
     if ~isempty(ctl2_trials{jj})
         % This segment is the pooled control conditions
         epochi = find(trialCount >= ctl2_trials{jj}(1) & trialCount <= ctl2_trials{jj}(end));
-        %epochi = [ctl_epochi; epochi];
+        epochi = [ctl_epochi; epochi];
     else
         epoch = ctl_epochi;
     end
@@ -249,7 +246,7 @@ for jj = 1:nMice
         slopes(jj,2) = NaN; slope_ci(jj,2) = NaN;
     end
     
-    %% Right Nostril Occluded 
+    
     if ~isempty(occr_trials{jj})
         %fprintf('Right Occlusion: ');
         epochi = find(trialCount >= occr_trials{jj}(1) & trialCount <= occr_trials{jj}(end));
@@ -293,7 +290,6 @@ for jj = 1:nMice
     else
         slopes(jj,3) = NaN; slope_ci(jj,3) = NaN;
     end
-    %% Left Nostril Occluded
     if ~isempty(occl_trials{jj})
         %fprintf('Left Occlusion: ');
         epochi = find(trialCount >= occl_trials{jj}(1) & trialCount <= occl_trials{jj}(end));
@@ -397,7 +393,6 @@ end
 
 %% Plotting just the means (and the significance) of the timeseries 
 sig = zeros(size(mu_ts));
-pm = zeros(size(mu_ts));
 for ii = 1:size(mu_ts,1)
     for jj = 3:4 %conditions to test
         test1 = squeeze(mustar(ii,2,:));
@@ -405,9 +400,8 @@ for ii = 1:size(mu_ts,1)
         test2 = squeeze(mustar(ii,jj,:));
         test2 = test2(~isnan(test2));
         if ~isempty(test1) && ~isempty(test2)
-            [p,h] = ranksum(test1, test2)
+            [p,h] = ranksum(test1, test2);
             sig(ii,jj) = h;
-            pm(ii,jj) = p;
         end
     end
 end
