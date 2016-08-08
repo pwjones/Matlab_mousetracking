@@ -24,7 +24,6 @@ if isempty(plotOptions)
    plotOptions = {'-','-','--','--'}; 
 end
 
-
 nfiles = [length(dist_cell); length(dist_cell2)];
 rew = {dist_cell, dist_cell2};
 distance_comp = cell(2,1);
