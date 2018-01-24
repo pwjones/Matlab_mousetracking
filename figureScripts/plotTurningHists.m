@@ -1,4 +1,4 @@
-function plotTurningHists(sniffData)
+function all_mags_dd = plotTurningHists(sniffData)
 %function plotTurningRoseHists(sniffData)
 %
 % Makes a few plots looking at the pre and 
@@ -188,7 +188,7 @@ med_mags_pos = NaN*zeros(length(edges_pos),3);
 mean_mags_pos = NaN*zeros(length(edges_dd),3);
 ste_mags_pos = NaN*zeros(length(edges_dd),3);
 all_mags_dd = {};
-for jj = 1:3
+for jj = 1:3 % different # of sniffs back
     [N, bin] = histc(sniffData.turnTrig_preTurnDistDiff(:,jj), edges_dd);
     for ii = 1:length(N)
         mags = 180/pi*turn_mag(bin==ii);
@@ -204,17 +204,29 @@ for jj = 1:3
         med_mags_pos(ii, jj) = median(mags);
         mean_mags_pos(ii, jj) = mean(mags);
         ste_mags_pos(ii, jj) = std(mags)./sqrt(numel(mags));
-        %all_mags_dd{ii, jj} = mags;
+        all_mags_dd{ii, jj} = mags; %uncomment to test position rather than change
+    end
+end
+
+% Let's test each of these lines for flatness via bootstrap methods
+bootstrap_h = zeros(size(all_mags_dd));
+bootstrap_pthresh = .05 / (size(all_mags_dd,1)-1);
+bootstrap_p = zeros(size(all_mags_dd));
+for jj=1:3 %# of sniffs back
+    comps = [1,2,4,5];
+    for ii=1:length(comps)
+        [bootstrap_h(ii,jj), p] = bootstrapMeanTest(all_mags_dd{3, jj}, all_mags_dd{comps(ii), jj}, bootstrap_pthresh);
+        bootstrap_p(ii,jj) = min(p);
     end
 end
 
 % Two way ANOVA on the turning magnitudes
 all_mags_dd = all_mags_dd(1:end-1, :);
 %all_mags_dd = all_mags_dd';
-buildANOVA2Matrix;
-disp('Doing an ANOVA on turning magnitudes');
-[p, table, stats] = anova2(testM, minelem);
-[c,m,h] = multcompare(stats, 'ctype', 'bonferroni');
+% buildANOVA2Matrix;
+% disp('Doing an ANOVA on turning magnitudes');
+% [p, table, stats] = anova2(testM, minelem);
+% [c,m,h] = multcompare(stats, 'ctype', 'bonferroni');
 
 
 figure;

@@ -137,6 +137,6 @@ figure;
 dm = [low_rates, ones(length(low_rates),1)];
 dm2 = [high_rates, 2*ones(length(high_rates),1)];
 datam = cat(1, dm, dm2);
-boxplot(datam(:,1), datam(:,2), 'plotstyle', 'traditional', 'notch', 'on');
+boxplot(datam(:,1), datam(:,2), 'Orientation', 'vertical','plotstyle', 'traditional', 'notch', 'on');
 
 
