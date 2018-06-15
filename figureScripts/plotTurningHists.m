@@ -22,7 +22,7 @@ function all_mags_dd = plotTurningHists(sniffData)
 % Figure 1 - Distance changes, turning probabilities
 % ---------------------------------------------------
 turnDirections = sniffData.turnDirections./abs(sniffData.turnDirections); %convert to signed 1's.
-edges = -9.5:9.5;
+edges = -9.5:.5:9.5;
 for jj = 1:size(sniffData.dist_diffs,2)
     [N,bin] = histc(sniffData.dist_diffs(:,jj), edges);
     nbins = length(N);
@@ -40,9 +40,7 @@ for jj = 1:size(sniffData.dist_diffs,2)
     end
     turnp(:,jj) = turn_counts(:)./N(:);
 end
-
 turnp(isnan(turnp)) = 0; %replace possible NaNs
-
 % similar, but doing it using the turning triggered data.
 for ii = 1:nbins
     for jj = 1:3
@@ -52,10 +50,19 @@ for ii = 1:nbins
     end
 end
  
+% getting the actual sets of delta NDs in order to test the distributions
+% for unimodality
+for jj=1:size(sniffData.dist_diffs, 2)
+   turni = sniffData.bturn == 1;
+   dND(:,jj) = sniffData.dist_diffs(turni,jj); 
+end
+
 figure;
 subplot(1,3,1);
 %bar(edges(1:end-1), N, 'histc');
 stairs(edges, N);
+hold on;
+stairs(edges, N_s);
 xlabel('\Delta Distance from Trail (mm)');
 ylabel('Counts');
 xlim([-10 10]);
