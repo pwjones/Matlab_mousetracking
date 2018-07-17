@@ -21,7 +21,10 @@ function all_mags_dd = plotTurningHists(sniffData)
        
 % Figure 1 - Distance changes, turning probabilities
 % ---------------------------------------------------
-turnDirections = sniffData.turnDirections./abs(sniffData.turnDirections); %convert to signed 1's.
+% Directions are coded -1: rightward, 1: leftward
+% Convert turning directions from leftward/rightward to towards/away
+turnDirections = sniffData.turnDirections ./ sniffData.sniffPos(:,end);
+turnDirections = turnDirections ./ abs(turnDirections); %convert to signed 1's.
 edges = -9.5:.5:9.5;
 for jj = 1:size(sniffData.dist_diffs,2)
     [N,bin] = histc(sniffData.dist_diffs(:,jj), edges);
@@ -42,10 +45,12 @@ for jj = 1:size(sniffData.dist_diffs,2)
 end
 turnp(isnan(turnp)) = 0; %replace possible NaNs
 % similar, but doing it using the turning triggered data.
+tt_turnDirs = sniffData.turnTrig_turnDirs ./ sniffData.turnTrig_turnPos;
+tt_turnDirs = tt_turnDirs ./ abs(tt_turnDirs); %convert to signed 1's.
 for ii = 1:nbins
     for jj = 1:3
         [N_s, bin_s] = histc(sniffData.turnTrig_preTurnDistDiff(:,jj), edges);
-        turns = sniffData.turnTrig_turnDirs(bin_s==ii);
+        turns = tt_turnDirs(bin_s==ii);
         turnToP(ii,jj) = sum(turns>0)./numel(turns);
     end
 end
@@ -92,27 +97,27 @@ cats = [-10 -2.5 2.5 10];
 [Ncat, catbin] = histc(sniffData.turnTrig_preTurnDistDiff(:,3), cats);
 pre = sniffData.turnTrig_preTurnHeadings(:,1);
 post = sniffData.turnTrig_postTurnHeadings(:,1);
-rh = rose2(mod(pre(catbin == 1)+2*pi, 2*pi));
+rh = polarhistogram(mod(pre(catbin == 1)+2*pi, 2*pi));
 title('Approach - Pre');
 %---------------
 subplot(2,3,2);
-rh = rose2(mod(pre(catbin == 2)+2*pi, 2*pi));
+rh = polarhistogram(mod(pre(catbin == 2)+2*pi, 2*pi));
 title('Small Change - Pre');
 %---------------
 subplot(2,3,3);
-rh = rose2(mod(pre(catbin == 3)+2*pi, 2*pi));
+rh = polarhistogram(mod(pre(catbin == 3)+2*pi, 2*pi));
 title('Away - Pre');
 %---------------
 subplot(2,3,4);
-rh = rose2(mod(post(catbin == 1)+2*pi, 2*pi));
+rh = polarhistogram(mod(post(catbin == 1)+2*pi, 2*pi));
 title('Approach - Post Turn');
 %---------------
 subplot(2,3,5);
-rh = rose2(mod(post(catbin == 2)+2*pi, 2*pi));
+rh = polarhistogram(mod(post(catbin == 2)+2*pi, 2*pi));
 title('Small Change - Post Turn');
 %---------------
 subplot(2,3,6);
-rh = rose2(mod(post(catbin == 3)+2*pi, 2*pi));
+rh = polarhistogram(mod(post(catbin == 3)+2*pi, 2*pi));
 title('Away - Post Turn');
 
 % Figure 3,4 - Turning Magnitude Scatterplot and Histograms
@@ -128,7 +133,7 @@ labelah = axes('Position', [ 0 0 1 1], 'Visible', 'off');
 text(.3, .1, ' Turning Magnitudes', 'FontSize', 18);
 subplot(2,3,1);
 ang_diff = circ_dist(post_angles, pre_angles);
-rose2(ang_diff);
+polarhistogram(ang_diff);
 title('Intersniff Approach');
 %[~, ang_diff] = rotationDirection(pre_angles, post_angles);
 med_diff = median(abs(ang_diff))
@@ -146,7 +151,7 @@ post_angles = mod(sniffData.turnTrig_postTurnHeadings(catbin == 2)+(2*pi), 2*pi)
 figure(scat_fig); plot(pre_angles, post_angles, 'xk');
 figure(diff_fig); subplot(2,3,2);
 ang_diff = circ_dist(post_angles, pre_angles);
-rose2(ang_diff);
+polarhistogram(ang_diff);
 title('Intersniff Small Change');
 %[~, ang_diff] = rotationDirection(pre_angles, post_angles);
 med_diff = median(abs(ang_diff))
@@ -165,7 +170,7 @@ figure(scat_fig); plot(pre_angles, post_angles, 'or');
 xlim([0 2*pi]); ylim([0 2*pi]);
 figure(diff_fig); subplot(2,3,3);
 ang_diff = circ_dist(post_angles, pre_angles);
-rose2(ang_diff);
+polarhistogram(ang_diff);
 title('Intersniff Away');
 %[~, ang_diff] = rotationDirection(pre_angles, post_angles);
 med_diff = median(abs(ang_diff))
@@ -262,10 +267,10 @@ xlabel('ND (mm)'); ylabel('Mean Turn Mag'); xlim([-15 15]);
 
 %% Figure 6 - Plotting measures of turning relative to sniff location
 % rather than intersniff differences
-
-turnDirections = sniffData.turnDirections./abs(sniffData.turnDirections); %convert to signed 1's.
+% turnDirections = sniffData.turnDirections./abs(sniffData.turnDirections); %convert to signed 1's.
+turnDirections = sniffData.turnDirections; 
 turnPos = sniffData.sniffPos(:,end);
-turnsLeft = turnDirections.*turnPos;
+turnsLeft = turnDirections;
 edges = -15:2:15;
 turnp = NaN*zeros(numel(edges), size(sniffData.sniffPos,2)-1);
 for jj = 2:size(sniffData.sniffPos,2)

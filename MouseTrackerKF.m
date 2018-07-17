@@ -4,8 +4,8 @@ classdef MouseTrackerKF < MouseTracker
         used_thresh = 0;
         p_mouse = .0007; %the proportion of pixels that are 
         kf = struct('nstates', {}, 'nob', {}, 's', {});
-        %mm_conv = .862; %mm/px linear, old res for data pre 2015
-        mm_conv = .7143; %mm/px linear, new resolution (14px/10mm) 
+        mm_conv = .862; %mm/px linear, old res for data pre 2015
+        %mm_conv = .7143; %mm/px linear, new resolution (14px/10mm) 
         fullPaths; %the full detected paths, to be saved if the paths are skeletonized
         exploredProp; %the proportions of the trails explored at each timepoint
         exploredLen; %the lengths of the trails explored at each timepoint (in px)

@@ -16,24 +16,24 @@ skeletonize_paths = 1;
 [videoList, folder_nums, day_nums] = listBehavioralVideos(base_folder, folders, mouse_names);
 
 % The post 2014b way of pool size checking
-% s = gcp('nocreate'); % If no pool, do not create new one.
-% if isempty(s)
-%     s = 0;
-% else
-%     s = s.NumWorkers;
-% end
-% 
-% if s~=0
-%     parfor ii = 1:length(videoList)
-%         perMouseData(ii) = loadMouseTracking(videoList{ii}, 1:length(videoList{ii}), following_thresh, skeletonize_paths);
-%     end
-% else
-%     for ii = 1:length(videoList)
-%         perMouseData(ii) = loadMouseTracking(videoList{ii}, 1:length(videoList{ii}), following_thresh, skeletonize_paths);
-%     end
-% end
-% 
-% save 'fallCohortData_20mm_followingthresh.mat' perMouseData;
+s = gcp('nocreate'); % If no pool, do not create new one.
+if isempty(s)
+    s = 0;
+else
+    s = s.NumWorkers;
+end
+
+if s~=0
+    parfor ii = 1:length(videoList)
+        perMouseData(ii) = loadMouseTracking(videoList{ii}, 1:length(videoList{ii}), following_thresh, skeletonize_paths);
+    end
+else
+    for ii = 1:length(videoList)
+        perMouseData(ii) = loadMouseTracking(videoList{ii}, 1:length(videoList{ii}), following_thresh, skeletonize_paths);
+    end
+end
+
+save 'fallCohortData_20mm_followingthresh.mat' perMouseData;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Let's Make a BUNCH OF PLOTS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

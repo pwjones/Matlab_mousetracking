@@ -7,8 +7,7 @@ function ret = loadMouseTracking(files, file_range, following_thresh, varargin)
 global VIDEO_ROOT;
 base_fname = VIDEO_ROOT;
 class_func = @MouseTrackerKF;
-%class_func = @MouseTrackerUnder2;
-mm_conv = .862; %mm/px linear
+mm_conv = .862; %mm/px linear; hardcoded tsk,tsk
 traj_wind = -30:30; 
 %%%%%%%%%%%%%%%% Start in on doing things  %%%%%%%%%%%%%%%%
 if ~iscell(files)
@@ -69,7 +68,7 @@ for ii = 1:nfiles
     fullname = fullfile(base_fname, fnames{ii});
     % want to number the days in case we plot performance over days
     dir_name = strtok(fnames{ii}, '/');
-    if ~strcmp(dir_name, prev_dir_name);
+    if ~strcmp(dir_name, prev_dir_name)
         curr_dir_num = curr_dir_num + 1;
     end
     prev_dir_name = dir_name;
@@ -94,7 +93,7 @@ for ii = 1:nfiles
     distract_dists_from_trail_persect{ii} = mt.orthogonalDistFromTrailPerSection(1:mt.nFrames,2, following_thresh) * mm_conv;
     [~, turning_dir{ii}, turning_traj{ii}] = mt.findFollowingTurns(1:mt.nFrames, 1, following_thresh, traj_wind);
     total_turning(ii) = mt.totalTurning(1:mt.nFrames);
-    [nose_trajectories{ii}, traj_dir{ii}, traj_window] = noseTrajectories(mt, -20:40);
+    [nose_trajectories{ii}, traj_dir{ii}, traj_window] = noseTrajectories(mt, -20:40); 
     % now collect a few factors about each of the movies
     total_frames(ii) = mt.nFrames;
     frame_rate(ii) = mt.frameRate;
@@ -132,11 +131,11 @@ ret.dist_trail_area = dist_trail_area;
 ret.rew_propFollowed = rew_propFollowed;
 ret.dist_propFollowed = dist_propFollowed;
 ret.dir_nums = dir_nums;
-ret.nose_trajectories = nose_trajectories;
+ret.nose_trajectories = nose_trajectories; %trajectories centered on trail crossings
 ret.traj_window = traj_window;
 ret.traj_dir = traj_dir;
-ret.turning_traj = turning_traj;
-ret.turning_dir = turning_dir;
-ret.file_names = file_names;
+ret.turning_traj = turning_traj; %trajectories centered on turning events
+ret.turning_dir = turning_dir; %turning directions, -1:rightward, 1: leftward
+ret.file_names = file_names; %filenames of video files
 ret.nose_vel = nose_vel;
 ret.body_vel = body_vel;

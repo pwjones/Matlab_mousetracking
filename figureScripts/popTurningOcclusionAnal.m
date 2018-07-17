@@ -26,7 +26,7 @@ for ii = 1:nMice
     end
     
     if (ii==1) 
-        %turning distances from trail by trial, dir, epoch, mouse
+        %turning distances from trail by trial, direction, epoch, mouse
         turn_dists = NaN*zeros(size(free,2), 2, 4, nMice); 
     end
     dir_arr = cell2mat(dirs);

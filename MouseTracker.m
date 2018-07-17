@@ -100,7 +100,7 @@ classdef MouseTracker < handle
                     [base_dir, base_fn, ext] =  fileparts(filename);
                     if strcmp(ext, '.mat')
                         loadVideo = 0;
-                    elseif strcmp(ext, '.avi') || strcmp(ext,'.m4v') || strcmp(ext,'.mpg')
+                    elseif strcmp(ext, '.avi') || strcmp(ext,'.m4v') || strcmp(ext,'.mpg') || strcmp(ext,'.mp4') 
                         loadVideo = 1;
                     elseif strcmp(ext, '.txt')
                         this.logFile = 1;

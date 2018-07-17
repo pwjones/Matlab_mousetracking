@@ -22,7 +22,7 @@ function varargout = detectPathsGui(varargin)
 
 % Edit the above text to modify the response to help detectPathsGui
 
-% Last Modified by GUIDE v2.5 18-Mar-2014 16:22:08
+% Last Modified by GUIDE v2.5 07-Jul-2018 17:19:08
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -157,4 +157,3 @@ pathIm = handles.vids(handles.vidi).plotPathsOnBg;
 imshow(pathIm);
 % Update handles structure
 %guidata(hObject, handles);
-

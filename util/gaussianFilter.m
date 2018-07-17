@@ -39,7 +39,7 @@ if stdg ~= 0
             filt_trace = filtfilt(filty, 1, in_trace);
         end
     else
-        disp('Unable to filter - input must be 3x longer than filter');
+        disp('gaussianFilt.m: Unable to filter - input must be 3x longer than filter. Returning unfiltered signal.');
         filt_trace = in_trace;
     end
     x = 1:length(in_trace);
